@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/idp/:path*",
+      "destination": "https://vasapi-sandbox.cashtoken.africa/idp/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://vasapi-sandbox.cashtoken.africa/api/:path*"
+    },
+    {
+      "source": "/((?!_next|static|favicon\\.ico|logos|images|assets|.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

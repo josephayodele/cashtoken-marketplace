@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import {
+  getRememberedSubject,
+  getUserInfo,
+  hasStoredSession,
+  signOut,
+  silentSignIn,
+} from '@/lib/cashtokenApi';
 import Header from './cashtoken/Header';
 import Footer from './cashtoken/Footer';
 import HomePage from './cashtoken/HomePage';
@@ -17,12 +24,12 @@ import OurTeam from './cashtoken/OurTeam';
 import FAQsPage from './cashtoken/FAQsPage';
 import ComingSoon from './cashtoken/ComingSoon';
 import GlobalAboutUs from './cashtoken/GlobalAboutUs';
-import UK_Page from './cashtoken/UK_Page';
 import UK_Header from './cashtoken/UK_Header';
 import UK_Footer from './cashtoken/UK_Footer';
 import UK_AboutUs from './cashtoken/UK_AboutUs';
 import UK_NewsletterPage from './cashtoken/UK_NewsletterPage';
 import UK_BrandsPage from './cashtoken/UK_BrandsPage';
+import UK_MarketplacePage from './cashtoken/UK_MarketplacePage';
 import UK_BrandDetails from './cashtoken/UK_BrandDetails';
 import UK_AirtimeDetails from './cashtoken/UK_AirtimeDetails';
 import UK_BusinessLanding from './cashtoken/UK_BusinessLanding';
@@ -37,6 +44,7 @@ const UK_PAGES = new Set([
   'uk',
   'ukbusiness',
   'uknewsletter',
+  'ukmarketplace',
   'ukbrands',
   'ukteam',
   'ukaboutus',
@@ -66,7 +74,7 @@ interface Transaction {
 }
 
 const AppLayout: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState('global');
+  const [currentPage, setCurrentPage] = useState('uk');
   const [walletBalance, setWalletBalance] = useState(1247.50);
   const [selectedBrand, setSelectedBrand] = useState<any>(null);
   const [selectedAirtimeProvider, setSelectedAirtimeProvider] = useState<any>(null);
@@ -84,57 +92,59 @@ const AppLayout: React.FC = () => {
   // Derived: are we currently on a UK page?
   const isUKSite = UK_PAGES.has(currentPage);
 
-  // ─── Auth listener ───
+  // ─── Cashtoken IDP auth rehydration ───
+  // On mount: if we have stored tokens, try /idp/user-info. If unauthorized but
+  // a remembered subject exists, fall back to silent-mode and retry.
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setIsDemoUser(false);
-        await loadUserData(session.user.id, session.user.email || '');
-      } else if (!isDemoUser) {
-        setUser(null);
-        setWalletBalance(1247.50);
-        setTransactions([]);
-      }
-      setAuthLoading(false);
-    });
+    let cancelled = false;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        loadUserData(session.user.id, session.user.email || '');
+    const restore = async () => {
+      try {
+        if (hasStoredSession()) {
+          try {
+            const info = await getUserInfo();
+            if (cancelled) return;
+            setUser({
+              id: info.ref,
+              full_name: info.name || `${info.firstName || ''} ${info.lastName || ''}`.trim() || info.email || '',
+              avatar_url: null,
+              email: info.email || '',
+            });
+            setProfileForm((prev) => ({ ...prev, full_name: info.name || prev.full_name }));
+            return;
+          } catch {
+            clearTokens();
+          }
+        }
+        const remembered = getRememberedSubject();
+        if (remembered) {
+          try {
+            await silentSignIn(remembered);
+            const info = await getUserInfo();
+            if (cancelled) return;
+            setUser({
+              id: info.ref,
+              full_name: info.name || `${info.firstName || ''} ${info.lastName || ''}`.trim() || info.email || '',
+              avatar_url: null,
+              email: info.email || '',
+            });
+            setProfileForm((prev) => ({ ...prev, full_name: info.name || prev.full_name }));
+          } catch {
+            // Silent-mode failed (key missing, expired, etc.) — stay signed out
+          }
+        }
+      } finally {
+        if (!cancelled) setAuthLoading(false);
       }
-      setAuthLoading(false);
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    restore();
+    return () => { cancelled = true; };
   }, []);
 
-  const loadUserData = async (userId: string, email: string) => {
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (profile) {
-        setUser({ id: userId, full_name: profile.full_name || '', avatar_url: profile.avatar_url, email });
-        setProfileForm((prev) => ({ ...prev, full_name: profile.full_name || '' }));
-      }
-
-      const { data: wallet } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', userId)
-        .single();
-
-      if (wallet) setWalletBalance(Number(wallet.balance));
-
-      await loadTransactions(userId);
-    } catch (err) {
-      console.error('Error loading user data:', err);
-    }
-  };
-
+  // Wallet/transactions are still backed by Supabase tables keyed by user.id.
+  // Cashtoken-authenticated users won't have matching rows, so these reads are
+  // best-effort no-ops until the Cashtoken VAS transaction endpoints are wired.
   const loadTransactions = async (userId?: string) => {
     const uid = userId || user?.id;
     if (!uid || isDemoUser) return;
@@ -237,14 +247,14 @@ const AppLayout: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleAuthSuccess = (demoUser?: UserProfile) => {
-    if (demoUser) {
-      setIsDemoUser(true);
-      setUser(demoUser);
-      setWalletBalance(1247.50);
-      setTransactions([]);
-      setProfileForm((prev) => ({ ...prev, full_name: demoUser.full_name }));
-    }
+  const handleAuthSuccess = (profile?: UserProfile) => {
+    if (!profile) return;
+    const isDemo = profile.id === 'demo-user-001';
+    setIsDemoUser(isDemo);
+    setUser(profile);
+    setWalletBalance(1247.50);
+    setTransactions([]);
+    setProfileForm((prev) => ({ ...prev, full_name: profile.full_name }));
   };
 
   const handleSignOut = async () => {
@@ -253,11 +263,10 @@ const AppLayout: React.FC = () => {
       setUser(null);
       setWalletBalance(1247.50);
       setTransactions([]);
-      // Stay on UK side if signed out from UK, otherwise go global
       setCurrentPage(isUKSite ? 'uk' : 'global');
       return;
     }
-    await supabase.auth.signOut();
+    await signOut();
     setUser(null);
     setWalletBalance(1247.50);
     setTransactions([]);
@@ -267,12 +276,8 @@ const AppLayout: React.FC = () => {
   const handleSaveProfile = async () => {
     if (!user) return;
     setProfileForm((prev) => ({ ...prev, saving: true, saved: false }));
-    if (!isDemoUser) {
-      await supabase
-        .from('profiles')
-        .update({ full_name: profileForm.full_name, updated_at: new Date().toISOString() })
-        .eq('id', user.id);
-    }
+    // Cashtoken IDP doesn't expose a profile-update endpoint in the v2 spec —
+    // this only updates the client-side display name for now.
     setUser((prev) => prev ? { ...prev, full_name: profileForm.full_name } : null);
     setProfileForm((prev) => ({ ...prev, saving: false, saved: true }));
     setTimeout(() => setProfileForm((prev) => ({ ...prev, saved: false })), 3000);
@@ -304,7 +309,13 @@ const AppLayout: React.FC = () => {
     switch (currentPage) {
 
       case 'uk':
-        return <UK_Page onNavigate={handleNavigate} walletBalance={walletBalance} />;
+        return (
+          <UK_MarketplacePage
+            onViewBrands={() => handleNavigate('ukbrands')}
+            walletBalance={walletBalance}
+            userName={user?.full_name}
+          />
+        );
 
       case 'ukteam':
         return (
@@ -320,6 +331,15 @@ const AppLayout: React.FC = () => {
             <BackButton label="Back to UK Home" onClick={() => handleNavigate('uk')} />
             <UK_NewsletterPage />
           </>
+        );
+
+      case 'ukmarketplace':
+        return (
+          <UK_MarketplacePage
+            onViewBrands={() => handleNavigate('ukbrands')}
+            walletBalance={walletBalance}
+            userName={user?.full_name}
+          />
         );
 
       case 'ukbrands':
@@ -411,7 +431,13 @@ const AppLayout: React.FC = () => {
         );
 
       default:
-        return <UK_Page onNavigate={handleNavigate} walletBalance={walletBalance} />;
+        return (
+          <UK_MarketplacePage
+            onViewBrands={() => handleNavigate('ukbrands')}
+            walletBalance={walletBalance}
+            userName={user?.full_name}
+          />
+        );
     }
   };
 
@@ -820,6 +846,7 @@ const AppLayout: React.FC = () => {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onAuthSuccess={handleAuthSuccess}
+        country={isUKSite ? 'GB' : 'NG'}
       />
 
       <style>{`

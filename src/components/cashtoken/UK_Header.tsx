@@ -121,11 +121,12 @@ const UK_Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSig
   const mobileCountryRef  = useRef<HTMLDivElement>(null);
 
   // FIX 2: UK-prefixed routes so nav items don't fall through to Nigeria pages
+  // 'Home' lands on the marketplace (the new UK landing page)
   const navItems = [
     { label: 'Home',        page: 'uk' },
+    { label: 'Brands',      page: 'ukbrands' },
     { label: 'Business',    page: 'ukbusiness' },
     { label: 'News Letter', page: 'uknewsletter' },
-    { label: 'Marketplace', page: 'ukbrands' },
     { label: 'About Us',    page: 'ukteam' },
   ];
 

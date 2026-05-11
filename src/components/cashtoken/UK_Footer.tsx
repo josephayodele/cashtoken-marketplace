@@ -38,11 +38,11 @@ const UK_Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <h4 className="font-semibold text-[#DAA520] mb-4 text-sm tracking-wider">QUICK LINKS</h4>
             <ul className="space-y-2.5">
               {[
-                { label: 'Home', page: 'home' },
-                { label: 'Marketplace', page: 'brands' },
-                { label: 'News Letter', page: 'newsletter' },
-                { label: 'About Us', page: 'team' },
-
+                { label: 'Home', page: 'uk' },
+                { label: 'Marketplace', page: 'ukmarketplace' },
+                { label: 'Brands & Gift Cards', page: 'ukbrands' },
+                { label: 'News Letter', page: 'uknewsletter' },
+                { label: 'About Us', page: 'ukteam' },
               ].map((item) => (
                 <li key={item.page}>
                   <button onClick={() => onNavigate(item.page)} className="text-gray-400 hover:text-[#DAA520] transition-colors text-sm">
