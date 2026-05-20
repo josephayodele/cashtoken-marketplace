@@ -4,8 +4,10 @@ import {
   getRememberedSubject,
   getUserInfo,
   hasStoredSession,
+  listTransactions,
   signOut,
   silentSignIn,
+  TransactionRecord,
 } from '@/lib/cashtokenApi';
 import Header from './cashtoken/Header';
 import Footer from './cashtoken/Footer';
@@ -142,19 +144,39 @@ const AppLayout: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // Wallet/transactions are still backed by Supabase tables keyed by user.id.
-  // Cashtoken-authenticated users won't have matching rows, so these reads are
-  // best-effort no-ops until the Cashtoken VAS transaction endpoints are wired.
-  const loadTransactions = async (userId?: string) => {
-    const uid = userId || user?.id;
-    if (!uid || isDemoUser) return;
-    const { data } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', uid)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (data) setTransactions(data as Transaction[]);
+  // Pull transactions whenever the signed-in user (or current site) changes.
+  useEffect(() => {
+    if (user && !isDemoUser) {
+      loadTransactions();
+    } else {
+      setTransactions([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isDemoUser, isUKSite]);
+
+  // Transactions are fetched from the Cashtoken VAS middleware.
+  // Filtered by current site's country code (GB on UK, NG elsewhere).
+  const loadTransactions = async () => {
+    if (!user || isDemoUser) return;
+    try {
+      const records = await listTransactions({
+        countryCode: isUKSite ? 'GB' : 'NG',
+        limit: 50,
+        sort: 'createdAt:desc',
+      });
+      // Normalise to the local Transaction shape the UI renders.
+      setTransactions(records.map((r: TransactionRecord, i) => ({
+        id: String(r.ref ?? r.id ?? i),
+        type: (r.type as string) || (typeof r.service === 'object' ? r.service?.ref ?? '' : (r.service as string)) || 'deposit',
+        amount: Number(r.amount ?? 0),
+        description: (r.description as string) || '',
+        brand: typeof r.service === 'object' ? (r.service?.name ?? null) : null,
+        created_at: (r.createdAt || r.created_at || new Date().toISOString()) as string,
+      })));
+    } catch (err) {
+      console.warn('Failed to load transactions:', err);
+      setTransactions([]);
+    }
   };
 
   const handleUpdateBalance = useCallback(async (

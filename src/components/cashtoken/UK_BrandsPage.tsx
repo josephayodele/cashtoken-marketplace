@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-
+import { useQuery } from '@tanstack/react-query';
+import { listCountryServices, listServiceFieldOptions, listUkGiftCards } from '@/lib/cashtokenApi';
 
 import GoldCoin from './GoldCoin';
 
@@ -20,157 +21,45 @@ const shopperImages = [
 ];
 const heroBanner = 'https://d64gsuwffb70l.cloudfront.net/698c74038d655b8d24d48fd8_1772110535174_8e9fba49.jpg';
 
-// ─── Deals data ───
-const hotDeals = [
-  { brand: 'Nike UK', deal: '20% OFF Trainers', color: '#111', textColor: '#fff', logo: 'NIKE' },
-  { brand: 'ASOS', deal: 'Buy 2 Get 1 Free', color: '#2D2D2D', textColor: '#fff', logo: 'ASOS' },
-  { brand: "Nando's", deal: 'Free Starter with Main', color: '#E31837', textColor: '#fff', logo: "Nando's" },
-  { brand: 'Deliveroo', deal: 'Free Delivery Today', color: '#00CCBC', textColor: '#fff', logo: 'deliveroo' },
-  { brand: 'Temu', deal: 'Up to 90% OFF', color: '#FB6F20', textColor: '#fff', logo: 'Temu' },
-  { brand: 'Costa Coffee', deal: 'Double Points Week', color: '#6B0F24', textColor: '#fff', logo: 'COSTA' },
-  { brand: 'Primark', deal: 'New Season Sale', color: '#003DA5', textColor: '#fff', logo: 'PRIMARK' },
-  { brand: 'Greggs', deal: '£1 Sausage Rolls', color: '#004B8D', textColor: '#FF6600', logo: 'GREGGS' },
-  { brand: 'H&M', deal: '30% OFF Everything', color: '#E50010', textColor: '#fff', logo: 'H&M' },
-  { brand: 'Uber Eats', deal: '£5 OFF First Order', color: '#142328', textColor: '#06C167', logo: 'UberEats' },
-];
-
-// ─── Affiliate Brands with website URLs ───
-const affiliateBrands = [
-  { id: 100, name: 'Temu', category: 'Lifestyle', color: '#FB6F20', textColor: '#fff', logo: 'Temu', website: 'https://www.temu.com', deal: 'Up to 90% OFF' },
-  { id: 1, name: 'Adidas UK', category: 'Lifestyle', color: '#000', textColor: '#fff', logo: 'adidas', website: 'https://www.adidas.co.uk', deal: '25% OFF New Arrivals' },
-  { id: 2, name: 'Nike UK', category: 'Lifestyle', color: '#111', textColor: '#fff', logo: 'NIKE', website: 'https://www.nike.com/gb', deal: '20% OFF Trainers' },
-  { id: 3, name: 'ASOS', category: 'Lifestyle', color: '#2D2D2D', textColor: '#fff', logo: 'ASOS', website: 'https://www.asos.com', deal: 'Buy 2 Get 1 Free' },
-  { id: 4, name: 'John Lewis', category: 'Lifestyle', color: '#004D3D', textColor: '#fff', logo: 'JL', website: 'https://www.johnlewis.com', deal: 'Price Match Promise' },
-  { id: 5, name: 'Argos', category: 'Lifestyle', color: '#E00034', textColor: '#fff', logo: 'ARGOS', website: 'https://www.argos.co.uk', deal: 'Flash Sale Today' },
-  { id: 6, name: 'Currys', category: 'Lifestyle', color: '#2F0A5B', textColor: '#fff', logo: 'CURRYS', website: 'https://www.currys.co.uk', deal: '£50 OFF Laptops' },
-  { id: 7, name: "Nando's", category: 'Foodie', color: '#E31837', textColor: '#fff', logo: "Nando's", website: 'https://www.nandos.co.uk', deal: 'Free Starter' },
-  { id: 8, name: 'Deliveroo', category: 'Foodie', color: '#00CCBC', textColor: '#fff', logo: 'deliveroo', website: 'https://deliveroo.co.uk', deal: 'Free Delivery' },
-  { id: 9, name: 'Uber Eats', category: 'Foodie', color: '#142328', textColor: '#06C167', logo: 'UberEats', website: 'https://www.ubereats.com/gb', deal: '£5 OFF First Order' },
-  { id: 10, name: 'Pizza Express', category: 'Foodie', color: '#003B5C', textColor: '#fff', logo: 'PE', website: 'https://www.pizzaexpress.com', deal: '2 for 1 Mains' },
-  { id: 11, name: 'Costa Coffee', category: 'Foodie', color: '#6B0F24', textColor: '#fff', logo: 'COSTA', website: 'https://www.costa.co.uk', deal: 'Double Points' },
-  { id: 12, name: 'Greggs', category: 'Foodie', color: '#004B8D', textColor: '#FF6600', logo: 'GREGGS', website: 'https://www.greggs.co.uk', deal: '£1 Sausage Rolls' },
-  { id: 13, name: 'Zara UK', category: 'Fashion', color: '#000', textColor: '#fff', logo: 'ZARA', website: 'https://www.zara.com/uk', deal: 'New Collection' },
-  { id: 14, name: 'H&M', category: 'Fashion', color: '#E50010', textColor: '#fff', logo: 'H&M', website: 'https://www2.hm.com/en_gb', deal: '30% OFF Everything' },
-  { id: 15, name: 'Primark', category: 'Fashion', color: '#003DA5', textColor: '#fff', logo: 'PRIMARK', website: 'https://www.primark.com/en-gb', deal: 'New Season Sale' },
-  { id: 16, name: 'Next UK', category: 'Fashion', color: '#333', textColor: '#fff', logo: 'NEXT', website: 'https://www.next.co.uk', deal: '15% OFF Online' },
-  { id: 17, name: 'River Island', category: 'Fashion', color: '#000', textColor: '#fff', logo: 'RI', website: 'https://www.riverisland.com', deal: 'Student Discount' },
-  { id: 18, name: 'Boohoo', category: 'Fashion', color: '#000', textColor: '#fff', logo: 'boohoo', website: 'https://www.boohoo.com', deal: '40% OFF Dresses' },
-  { id: 19, name: 'Tesco', category: 'Groceries', color: '#00539F', textColor: '#E31837', logo: 'TESCO', website: 'https://www.tesco.com', deal: 'Clubcard Deals' },
-  { id: 20, name: 'ASDA', category: 'Groceries', color: '#78BE20', textColor: '#fff', logo: 'ASDA', website: 'https://www.asda.com', deal: 'Rollback Prices' },
-  { id: 21, name: "Sainsbury's", category: 'Groceries', color: '#F06C00', textColor: '#fff', logo: "Sainsbury's", website: 'https://www.sainsburys.co.uk', deal: 'Nectar Bonus' },
-  { id: 22, name: 'Marks & Spencer', category: 'Groceries', color: '#000', textColor: '#DAA520', logo: 'M&S', website: 'https://www.marksandspencer.com', deal: 'Dine In for £12' },
-  { id: 23, name: 'Waitrose', category: 'Groceries', color: '#004D3D', textColor: '#fff', logo: 'WAITROSE', website: 'https://www.waitrose.com', deal: '20% OFF Wine' },
-  { id: 24, name: 'Lidl', category: 'Groceries', color: '#0050AA', textColor: '#FFF000', logo: 'LIDL', website: 'https://www.lidl.co.uk', deal: 'Middle Aisle Finds' },
-];
-
 // ─── Gift Card Brands ───
-const giftCardBrands = [
-  { id: 1, name: 'Adidas UK', category: 'Lifestyle', price: '£0.01', color: '#000', textColor: '#fff', logo: 'adidas' },
-  { id: 2, name: 'Nike UK', category: 'Lifestyle', price: '£5.00', color: '#111', textColor: '#fff', logo: 'NIKE' },
-  { id: 3, name: 'ASOS', category: 'Lifestyle', price: '£10.00', color: '#2D2D2D', textColor: '#fff', logo: 'ASOS' },
-  { id: 4, name: 'John Lewis', category: 'Lifestyle', price: '£10.00', color: '#004D3D', textColor: '#fff', logo: 'JL' },
-  { id: 5, name: 'Argos', category: 'Lifestyle', price: '£5.00', color: '#E00034', textColor: '#fff', logo: 'ARGOS' },
-  { id: 6, name: 'Currys', category: 'Lifestyle', price: '£10.00', color: '#2F0A5B', textColor: '#fff', logo: 'CURRYS' },
-  { id: 7, name: "Nando's", category: 'Foodie', price: '£10.00', color: '#E31837', textColor: '#fff', logo: "Nando's" },
-  { id: 8, name: 'Deliveroo', category: 'Foodie', price: '£5.00', color: '#00CCBC', textColor: '#fff', logo: 'deliveroo' },
-  { id: 9, name: 'Uber Eats', category: 'Foodie', price: '£10.00', color: '#142328', textColor: '#06C167', logo: 'UberEats' },
-  { id: 10, name: 'Pizza Express', category: 'Foodie', price: '£10.00', color: '#003B5C', textColor: '#fff', logo: 'PE' },
-  { id: 11, name: 'Costa Coffee', category: 'Foodie', price: '£5.00', color: '#6B0F24', textColor: '#fff', logo: 'COSTA' },
-  { id: 12, name: 'Greggs', category: 'Foodie', price: '£2.00', color: '#004B8D', textColor: '#FF6600', logo: 'GREGGS' },
-  { id: 13, name: 'Zara UK', category: 'Fashion', price: '£25.00', color: '#000', textColor: '#fff', logo: 'ZARA' },
-  { id: 14, name: 'H&M', category: 'Fashion', price: '£5.00', color: '#E50010', textColor: '#fff', logo: 'H&M' },
-  { id: 15, name: 'Primark', category: 'Fashion', price: '£5.00', color: '#003DA5', textColor: '#fff', logo: 'PRIMARK' },
-  { id: 16, name: 'Next UK', category: 'Fashion', price: '£10.00', color: '#333', textColor: '#fff', logo: 'NEXT' },
-  { id: 17, name: 'River Island', category: 'Fashion', price: '£10.00', color: '#000', textColor: '#fff', logo: 'RI' },
-  { id: 18, name: 'Boohoo', category: 'Fashion', price: '£5.00', color: '#000', textColor: '#fff', logo: 'boohoo' },
-  { id: 19, name: 'Tesco', category: 'Groceries', price: '£5.00', color: '#00539F', textColor: '#E31837', logo: 'TESCO' },
-  { id: 20, name: 'ASDA', category: 'Groceries', price: '£5.00', color: '#78BE20', textColor: '#fff', logo: 'ASDA' },
-  { id: 21, name: "Sainsbury's", category: 'Groceries', price: '£5.00', color: '#F06C00', textColor: '#fff', logo: "Sainsbury's" },
-  { id: 22, name: 'Marks & Spencer', category: 'Groceries', price: '£10.00', color: '#000', textColor: '#DAA520', logo: 'M&S' },
-  { id: 23, name: 'Waitrose', category: 'Groceries', price: '£10.00', color: '#004D3D', textColor: '#fff', logo: 'WAITROSE' },
-  { id: 24, name: 'Lidl', category: 'Groceries', price: '£5.00', color: '#0050AA', textColor: '#FFF000', logo: 'LIDL' },
-];
+// All brand data is fetched live from /api/uk/gift-card. No hardcoded fallback.
+
+// Brand object shape used by the UI after normalisation from the API.
+type GiftCardBrand = {
+  id: number;
+  name: string;
+  category: string;
+  price: string;
+  color: string;
+  textColor: string;
+  logo: string;
+  image?: string;
+  brand_code?: string;
+  products?: unknown[];
+};
+
+// Deterministic colour from brand name so the same brand always looks the same
+// across renders, without needing a hand-curated lookup table.
+const PALETTE = ['#1F2937', '#7C2D12', '#1E40AF', '#831843', '#365314', '#0E7490', '#7C3AED', '#9A3412', '#0F766E', '#5B21B6'];
+function colorFromName(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return PALETTE[Math.abs(h) % PALETTE.length];
+}
 
 // ─── UK Airtime Providers ───
-const airtimeProviders = [
-  { id: 201, name: 'EE', color: '#007B85', textColor: '#FFCB05', logo: 'EE' },
-  { id: 202, name: 'Vodafone', color: '#E60000', textColor: '#fff', logo: 'vodafone' },
-  { id: 203, name: 'Three', color: '#000', textColor: '#FF6900', logo: 'Three' },
-  { id: 204, name: 'O2', color: '#0019A5', textColor: '#fff', logo: 'O2' },
-  { id: 205, name: 'giffgaff', color: '#000', textColor: '#37B34A', logo: 'giffgaff' },
-  { id: 206, name: 'Tesco Mobile', color: '#00539F', textColor: '#E31837', logo: 'Tesco' },
-  { id: 207, name: 'Sky Mobile', color: '#0072C9', textColor: '#fff', logo: 'Sky' },
-  { id: 208, name: 'Virgin Media', color: '#C3092D', textColor: '#fff', logo: 'Virgin' },
-  { id: 209, name: 'BT Mobile', color: '#5514B4', textColor: '#fff', logo: 'BT' },
-  { id: 210, name: 'Lebara', color: '#E4007C', textColor: '#fff', logo: 'Lebara' },
-  { id: 211, name: 'Lycamobile', color: '#003DA5', textColor: '#FFD700', logo: 'Lyca' },
-  { id: 212, name: 'VOXI', color: '#FF6B00', textColor: '#fff', logo: 'VOXI' },
-];
+// Fetched live from /api/countries/gb/services/airtime/fields/provider.code/options.json.
 
-const categories = ['All', 'Lifestyle', 'Foodie', 'Fashion', 'Groceries', 'Other Services'];
+type AirtimeProvider = {
+  id: string;       // provider.code value (e.g. "9457:67")
+  name: string;     // description
+  color: string;
+  textColor: string;
+  logo: string;
+  icon?: string;    // raw icon key from API
+};
 
 type OtherServicesTab = 'giftcard' | 'credit' | 'international';
-
-// ─── Deal Popup Component ───
-const DealPopup: React.FC<{ deal: typeof hotDeals[0]; index: number; onClose: () => void }> = ({ deal, index, onClose }) => {
-  const positions = [
-    'top-20 right-4', 'top-40 left-4', 'top-60 right-8', 'bottom-40 left-8',
-    'top-32 right-12', 'bottom-60 right-4', 'top-48 left-12', 'bottom-32 left-4',
-    'top-24 left-20', 'bottom-48 right-16'
-  ];
-  return (
-    <div
-      className={`fixed z-50 ${positions[index % positions.length]} animate-dealPopIn`}
-      style={{ animationDelay: `${index * 0.3}s` }}
-    >
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-3 max-w-[200px] relative overflow-hidden">
-        <button onClick={onClose} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-        <div className="flex items-center gap-2 mb-1.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: deal.color }}>
-            <span className="text-[8px] font-bold" style={{ color: deal.textColor }}>{deal.logo}</span>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-gray-900 leading-tight">{deal.brand}</p>
-            <p className="text-[9px] text-[#7B0F14] font-semibold">{deal.deal}</p>
-          </div>
-        </div>
-        <div className="h-0.5 rounded-full bg-gradient-to-r from-[#DAA520] via-[#7B0F14] to-[#DAA520] animate-shimmerBar" />
-      </div>
-    </div>
-  );
-};
-
-// ─── Scrolling Deals Ticker ───
-const DealsTicker: React.FC = () => (
-  <div className="overflow-hidden bg-gradient-to-r from-[#7B0F14] via-[#A52228] to-[#7B0F14] py-2.5 relative">
-    <div className="flex animate-ticker whitespace-nowrap">
-      {[...hotDeals, ...hotDeals, ...hotDeals].map((deal, i) => (
-        <div key={i} className="inline-flex items-center gap-2 mx-6">
-          <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ backgroundColor: deal.color }}>
-            <span className="text-[7px] font-bold" style={{ color: deal.textColor }}>{deal.logo}</span>
-          </div>
-          <span className="text-white/90 text-xs font-medium">{deal.brand}:</span>
-          <span className="text-[#DAA520] text-xs font-bold">{deal.deal}</span>
-          <span className="text-white/30 mx-2">|</span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-// ─── Floating Deal Badge on Brand Card ───
-const DealBadge: React.FC<{ deal: string; visible: boolean }> = ({ deal, visible }) => {
-  if (!visible) return null;
-  return (
-    <div className="absolute -top-1 -right-1 z-10 animate-dealBounce">
-      <div className="bg-[#DAA520] text-white text-[8px] font-bold px-2 py-1 rounded-lg shadow-lg whitespace-nowrap transform rotate-3">
-        {deal}
-      </div>
-    </div>
-  );
-};
 
 // Scroll-triggered visibility hook
 function useInView(threshold = 0.15) {
@@ -198,99 +87,135 @@ function useInView(threshold = 0.15) {
 }
 
 const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirtime, onBack }) => {
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [search, setSearch] = useState('');
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [otherServicesTab, setOtherServicesTab] = useState<OtherServicesTab>('giftcard');
   const [gcSearch, setGcSearch] = useState('');
   const [gcCategory, setGcCategory] = useState('All');
   const [gcDropdownOpen, setGcDropdownOpen] = useState(false);
   const [airSearch, setAirSearch] = useState('');
   const [mounted, setMounted] = useState(false);
-  const [showDeals, setShowDeals] = useState<number[]>([]);
-  const [activeDealPopups, setActiveDealPopups] = useState<number[]>([]);
-  const [hoveredBrand, setHoveredBrand] = useState<number | null>(null);
   const [heroLoaded, setHeroLoaded] = useState(false);
 
   // Scroll-triggered section refs
   const shoppersSection = useInView(0.08);
-  const nearYouSection = useInView(0.08);
   const ctaSection = useInView(0.1);
 
-  const giftCardCategories = ['All', 'Lifestyle', 'Foodie', 'Fashion', 'Groceries'];
-  const isOtherServices = activeCategory === 'Other Services';
+  // Fetch the real UK gift-card catalog from the middleware. No fallback —
+  // the UI shows loading/empty/error states explicitly.
+  const {
+    data: apiGiftCards,
+    isLoading: giftCardsLoading,
+    isError:   giftCardsError,
+  } = useQuery({
+    queryKey: ['uk-gift-cards'],
+    queryFn: listUkGiftCards,
+    staleTime: 5 * 60_000,
+    retry: 1,
+  });
 
-  // Entrance animation
+  // Fetch the real UK airtime provider list.
+  const {
+    data: apiAirtime,
+    isLoading: airtimeLoading,
+    isError:   airtimeError,
+  } = useQuery({
+    queryKey: ['uk-airtime-providers'],
+    queryFn: () => listServiceFieldOptions({
+      country: 'gb',
+      service: 'airtime',
+      field:   'provider.code',
+    }),
+    staleTime: 10 * 60_000,
+    retry: 1,
+  });
+
+  // Fetch the top-level VAS service catalog for the UK (Airtime, Voucher, …).
+  const {
+    data: apiServices,
+    isLoading: servicesLoading,
+    isError:   servicesError,
+  } = useQuery({
+    queryKey: ['uk-services'],
+    queryFn: () => listCountryServices('gb'),
+    staleTime: 30 * 60_000,    // service catalog rarely changes
+    retry: 1,
+  });
+
+  // Normalise options.json items to the AirtimeProvider shape used by the UI.
+  const effectiveAirtimeProviders: AirtimeProvider[] = useMemo(() => {
+    if (!apiAirtime) return [];
+    return apiAirtime.map((opt) => {
+      const name = (opt.description || String(opt.const)).toString();
+      return {
+        id:        String(opt.const),
+        name,
+        color:     colorFromName(name),
+        textColor: '#fff',
+        logo:      (opt.icon as string) || name.split(' ').map(w => w[0]).join('').slice(0, 4).toUpperCase(),
+        icon:      opt.icon as string | undefined,
+      };
+    });
+  }, [apiAirtime]);
+
+  // Normalise the API shape to the card shape the UI expects.
+  // Real fields (empirical — endpoint isn't documented):
+  //   brand_name / name             → display name
+  //   gift_card_design[0].image_url → real Cloudinary image
+  //   products[].min_purchase       → denominations; we show the cheapest
+  //   products[0].brand_params.subCategory → category bucket
+  const effectiveGiftCardBrands: GiftCardBrand[] = useMemo(() => {
+    if (!apiGiftCards) return [];
+    return apiGiftCards.map((g, i): GiftCardBrand => {
+      const name = (g.brand_name || g.name || `Gift Card ${i + 1}`).toString();
+      const products = Array.isArray(g.products) ? g.products : [];
+      const minPrice = products.length > 0
+        ? Math.min(...products.map(p => Number(p.min_purchase || 0)))
+        : 0;
+      const image    = g.gift_card_design?.[0]?.image_url;
+      const category =
+        (g.gift_card_category?.name as string | undefined) ||
+        products[0]?.brand_params?.subCategory ||
+        'Gift Cards';
+      return {
+        id:         g.id ?? i + 1,
+        name,
+        category,
+        price:      `£${minPrice.toFixed(2)}`,
+        color:      colorFromName(name),
+        textColor:  '#fff',
+        logo:       name.split(' ').map(w => w[0]).join('').slice(0, 4).toUpperCase(),
+        image,
+        brand_code: g.brand_code,
+        products,
+      };
+    });
+  }, [apiGiftCards]);
+
+  // Derive category list from whichever data source is active (API or fallback)
+  // so the filter pills always match what's actually displayed.
+  const giftCardCategories = useMemo(() => {
+    const cats = new Set<string>();
+    effectiveGiftCardBrands.forEach((b) => { if (b.category) cats.add(b.category); });
+    return ['All', ...Array.from(cats)];
+  }, [effectiveGiftCardBrands]);
   useEffect(() => {
     setMounted(true);
     const heroTimer = setTimeout(() => setHeroLoaded(true), 100);
-    // Stagger deal badge reveals
-    const timers: NodeJS.Timeout[] = [];
-    affiliateBrands.forEach((_, i) => {
-      timers.push(setTimeout(() => {
-        setShowDeals(prev => [...prev, i]);
-      }, 800 + i * 120));
-    });
-    return () => { timers.forEach(clearTimeout); clearTimeout(heroTimer); };
+    return () => { clearTimeout(heroTimer); };
   }, []);
-
-
-  // Cycling deal popups
-  useEffect(() => {
-    let popupIndex = 0;
-    const interval = setInterval(() => {
-      setActiveDealPopups(prev => {
-        const next = [...prev, popupIndex % hotDeals.length];
-        if (next.length > 3) next.shift();
-        return next;
-      });
-      popupIndex++;
-    }, 3000);
-    // Show first popup after 2s
-    const firstTimer = setTimeout(() => {
-      setActiveDealPopups([0]);
-    }, 2000);
-    return () => { clearInterval(interval); clearTimeout(firstTimer); };
-  }, []);
-
-  const closeDealPopup = (idx: number) => {
-    setActiveDealPopups(prev => prev.filter(i => i !== idx));
-  };
-
-  // ─── Filtering ───
-  const filteredAffiliateBrands = useMemo(() => {
-    return affiliateBrands.filter((b) => {
-      const matchesSearch = b.name.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = activeCategory === 'All' || b.category === activeCategory;
-      return matchesSearch && matchesCategory;
-    });
-  }, [search, activeCategory]);
-
-  const groupedAffiliateBrands = useMemo(() => {
-    if (activeCategory !== 'All') {
-      return { [activeCategory]: filteredAffiliateBrands };
-    }
-    const groups: Record<string, typeof affiliateBrands> = {};
-    filteredAffiliateBrands.forEach((b) => {
-      if (!groups[b.category]) groups[b.category] = [];
-      groups[b.category].push(b);
-    });
-    return groups;
-  }, [filteredAffiliateBrands, activeCategory]);
 
   const filteredGiftCardBrands = useMemo(() => {
-    return giftCardBrands.filter((b) => {
+    return effectiveGiftCardBrands.filter((b) => {
       const matchesSearch = b.name.toLowerCase().includes(gcSearch.toLowerCase());
       const matchesCategory = gcCategory === 'All' || b.category === gcCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [gcSearch, gcCategory]);
+  }, [effectiveGiftCardBrands, gcSearch, gcCategory]);
 
   const groupedGiftCardBrands = useMemo(() => {
     if (gcCategory !== 'All') {
       return { [gcCategory]: filteredGiftCardBrands };
     }
-    const groups: Record<string, typeof giftCardBrands> = {};
+    const groups: Record<string, GiftCardBrand[]> = {};
     filteredGiftCardBrands.forEach((b) => {
       if (!groups[b.category]) groups[b.category] = [];
       groups[b.category].push(b);
@@ -299,10 +224,10 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
   }, [filteredGiftCardBrands, gcCategory]);
 
   const filteredAirtimeProviders = useMemo(() => {
-    return airtimeProviders.filter((p) =>
+    return effectiveAirtimeProviders.filter((p) =>
       p.name.toLowerCase().includes(airSearch.toLowerCase())
     );
-  }, [airSearch]);
+  }, [effectiveAirtimeProviders, airSearch]);
 
   return (
     <div className="bg-white min-h-screen relative">
@@ -378,11 +303,6 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
         }
       `}</style>
 
-      {/* ═══ DEAL POPUPS (floating) ═══ */}
-      {activeDealPopups.map((dealIdx) => (
-        <DealPopup key={`popup-${dealIdx}`} deal={hotDeals[dealIdx]} index={dealIdx} onClose={() => closeDealPopup(dealIdx)} />
-      ))}
-
       {/* Back Button */}
       {onBack && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
@@ -413,20 +333,20 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
             </h1>
 
             <p className="text-white/80 text-sm md:text-base mb-6 max-w-md">
-              Discover amazing deals from 24+ top UK brands. Every purchase over £50 earns you CashTokens worth up to £1,000,000!
+              Buy gift cards and top up airtime — every purchase earns you CashTokens.
             </p>
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => { setActiveCategory('All'); document.getElementById('brands-grid')?.scrollIntoView({ behavior: 'smooth' }); }}
+                onClick={() => { setOtherServicesTab('giftcard'); document.getElementById('brands-grid')?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="bg-[#DAA520] hover:bg-[#C4941A] text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
-                Explore Brands
+                Browse Gift Cards
               </button>
               <button
-                onClick={() => setActiveCategory('Other Services')}
+                onClick={() => { setOtherServicesTab('credit'); document.getElementById('brands-grid')?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all border border-white/20"
               >
-                Gift Cards & More
+                Top Up Airtime
               </button>
             </div>
           </div>
@@ -447,9 +367,6 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
         </div>
       </div>
 
-      {/* ═══ DEALS TICKER ═══ */}
-      <DealsTicker />
-
       {/* ═══ EARN BANNER ═══ */}
       <div className="bg-gradient-to-r from-[#F4E6E6] via-white to-[#F4E6E6] py-4 px-4">
         <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
@@ -467,275 +384,78 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="brands-grid">
-
-        {/* Search bar */}
-        {!isOtherServices && (
-          <div className={`flex flex-col sm:flex-row gap-4 mb-6 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <div className="flex-1 relative group">
-              <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#7B0F14] transition-colors" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search brands, deals, categories..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-gray-200 focus:border-[#7B0F14] focus:ring-4 focus:ring-[#7B0F14]/10 outline-none transition-all text-sm bg-gray-50/50 hover:bg-white"
-              />
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-2 px-6 py-3.5 rounded-2xl border-2 border-gray-200 hover:border-[#7B0F14] transition-all text-sm font-medium min-w-[160px] justify-between bg-gray-50/50 hover:bg-white"
-              >
-                <span>{activeCategory === 'All' ? 'Categories' : activeCategory}</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className={`transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}>
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-              {dropdownOpen && (
-                <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl shadow-2xl border border-gray-100 z-20 overflow-hidden animate-scaleIn">
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => { setActiveCategory(cat); setDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-3 text-sm hover:bg-[#F4E6E6] transition-colors ${
-                        activeCategory === cat ? 'bg-[#F4E6E6] text-[#7B0F14] font-semibold' : 'text-gray-700'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+      {/* ─── Service catalog (live from middleware) ─── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <div className="flex items-end justify-between mb-4">
+          <div>
+            <p className="text-[10px] font-bold text-[#DAA520] uppercase tracking-[0.2em] mb-1">Available in the UK</p>
+            <h2 className="text-xl sm:text-2xl font-black text-gray-900">Services</h2>
           </div>
-        )}
-
-        {/* Category pills with animation */}
-        <div className={`flex flex-wrap gap-2 mb-8 transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          {categories.map((cat, i) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${
-                activeCategory === cat
-                  ? 'bg-gradient-to-r from-[#7B0F14] to-[#A52228] text-white shadow-lg shadow-[#7B0F14]/25 scale-105'
-                  : 'bg-gray-100 text-gray-600 hover:bg-[#F4E6E6] hover:text-[#7B0F14] hover:scale-105'
-              }`}
-              style={{ animationDelay: `${i * 0.1}s` }}
-            >
-              {cat}
-            </button>
-          ))}
         </div>
 
-        {/* ═══ AFFILIATE BRANDS ═══ */}
-        {!isOtherServices && (
-          <div>
-            {Object.entries(groupedAffiliateBrands).map(([category, categoryBrands], catIdx) => (
-              <div key={category} className="mb-12">
-                <div className="flex items-center justify-between mb-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-8 rounded-full bg-gradient-to-b from-[#7B0F14] to-[#DAA520]" />
-                    <h2 className="text-2xl font-black text-gray-900">{category}</h2>
-                    <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">{categoryBrands.length} brands</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-[#DAA520]">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                    <span className="text-xs font-bold">Hot Deals</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
-                  {categoryBrands.map((brand, brandIdx) => {
-                    const globalIdx = affiliateBrands.findIndex(b => b.id === brand.id);
-                    const showDeal = showDeals.includes(globalIdx);
-                    const isHovered = hoveredBrand === brand.id;
-                    return (
-                      <a
-                        key={brand.id}
-                        href={brand.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="brand-card-enter rounded-3xl overflow-hidden bg-white text-left group block relative"
-                        style={{
-                          animationDelay: `${(catIdx * 0.2) + (brandIdx * 0.08)}s`,
-                          boxShadow: isHovered ? '0 12px 40px rgba(123,15,20,0.2)' : '0 4px 15px rgba(0,0,0,0.08)',
-                          transform: isHovered ? 'translateY(-6px) scale(1.02)' : 'translateY(0) scale(1)',
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        }}
-                        onMouseEnter={() => setHoveredBrand(brand.id)}
-                        onMouseLeave={() => setHoveredBrand(null)}
-                      >
-                        {/* Deal badge */}
-                        <DealBadge deal={brand.deal} visible={showDeal} />
-
-                        {/* Brand header */}
-                        <div
-                          className="h-28 flex items-center justify-center relative overflow-hidden"
-                          style={{ backgroundColor: brand.color }}
-                        >
-                          {/* Shimmer effect on hover */}
-                          {isHovered && <div className="absolute inset-0 deal-shimmer" />}
-
-                          {/* Animated logo */}
-                          <span
-                            className={`text-2xl font-black transition-all duration-300 ${isHovered ? 'scale-110' : 'scale-100'}`}
-                            style={{ color: brand.textColor }}
-                          >
-                            {brand.logo}
-                          </span>
-
-                          {/* Sparkle particles */}
-                          {isHovered && (
-                            <>
-                              <div className="absolute top-3 left-3 w-2 h-2 rounded-full bg-white/60 animate-sparkle" style={{ animationDelay: '0s' }} />
-                              <div className="absolute top-5 right-5 w-1.5 h-1.5 rounded-full bg-white/40 animate-sparkle" style={{ animationDelay: '0.3s' }} />
-                              <div className="absolute bottom-4 left-6 w-1 h-1 rounded-full bg-white/50 animate-sparkle" style={{ animationDelay: '0.6s' }} />
-                            </>
-                          )}
-
-                          {/* Gold coin badge */}
-                          <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 transition-transform duration-300 ${isHovered ? 'scale-125' : 'scale-100'}`}>
-                            <GoldCoin size={28} />
-                          </div>
-                        </div>
-
-                        {/* Brand info */}
-                        <div className="p-3 pt-5">
-                          <p className="text-[10px] text-gray-500 leading-tight">
-                            Shop & stand a chance to win between <span className="text-[#7B0F14] font-semibold">£100 - £1,000,000</span>
-                          </p>
-                          {/* Deal text */}
-                          <div className="mt-1.5 flex items-center gap-1">
-                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                            <span className="text-[9px] font-bold text-green-600">{brand.deal}</span>
-                          </div>
-                          {/* External link */}
-                          <div className={`flex items-center gap-1 mt-2 transition-all duration-300 ${isHovered ? 'translate-x-1' : ''}`}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                              <polyline points="15 3 21 3 21 9" />
-                              <line x1="10" y1="14" x2="21" y2="3" />
-                            </svg>
-                            <span className="text-[10px] text-[#7B0F14] font-semibold">Visit & Earn</span>
-                          </div>
-                        </div>
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
+        {servicesLoading && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-gray-100 p-4 animate-pulse h-24" />
             ))}
-
-            {/* ═══ HAPPY SHOPPERS SECTION ═══ */}
-            <div className="mb-12 bg-gradient-to-br from-[#F4E6E6] via-white to-[#FEF9C3] rounded-3xl p-6 md:p-10 overflow-hidden relative" ref={shoppersSection.ref}>
-              {/* Decorative elements */}
-              <div className="absolute top-4 right-4 w-20 h-20 rounded-full bg-[#DAA520]/10 animate-floatSlow" />
-              <div className="absolute bottom-4 left-4 w-16 h-16 rounded-full bg-[#7B0F14]/10 animate-floatSlow" style={{ animationDelay: '1s' }} />
-
-              <div className="text-center mb-8 relative z-10">
-                <div
-                  className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-1.5 mb-3 shadow-sm"
-                  style={{
-                    opacity: shoppersSection.isVisible ? 1 : 0,
-                    transform: shoppersSection.isVisible ? 'translateY(0) scale(1)' : 'translateY(-20px) scale(0.9)',
-                    transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s',
-                  }}
-                >
-                  <GoldCoin size={16} />
-                  <span className="text-[#7B0F14] text-xs font-bold">Real People, Real Rewards</span>
-                </div>
-                <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-2">
-                  <span className="inline-block" style={{ opacity: shoppersSection.isVisible ? 1 : 0, transform: shoppersSection.isVisible ? 'translateX(0)' : 'translateX(-80px)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s' }}>Join Thousands</span>{' '}
-                  <span className="inline-block" style={{ opacity: shoppersSection.isVisible ? 1 : 0, transform: shoppersSection.isVisible ? 'translateX(0)' : 'translateX(80px)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s' }}>of Happy</span>{' '}
-                  <span className="inline-block text-[#7B0F14]" style={{ opacity: shoppersSection.isVisible ? 1 : 0, transform: shoppersSection.isVisible ? 'translateX(0) scale(1)' : 'translateX(-60px) scale(0.85)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.45s' }}>Shoppers</span>
-                </h2>
-                <p
-                  className="text-gray-500 text-sm max-w-lg mx-auto"
-                  style={{
-                    opacity: shoppersSection.isVisible ? 1 : 0,
-                    transform: shoppersSection.isVisible ? 'translateY(0)' : 'translateY(20px)',
-                    transition: 'all 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.55s',
-                  }}
-                >
-                  Our community earns CashTokens every day. Shop your favourite brands and get rewarded!
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 relative z-10">
-                {shopperImages.map((img, i) => (
-                  <div
-                    key={i}
-                    className="relative rounded-2xl overflow-hidden shadow-lg group cursor-pointer"
-                    style={{
-                      opacity: shoppersSection.isVisible ? 1 : 0,
-                      transform: shoppersSection.isVisible ? 'translateX(0) scale(1)' : (i % 2 === 0 ? 'translateX(-50px) scale(0.9)' : 'translateX(50px) scale(0.9)'),
-                      transition: `all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) ${0.3 + i * 0.1}s`,
-                    }}
-                  >
-                    <img src={img} alt={`Happy shopper ${i + 1}`} className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                      <div className="flex items-center gap-1.5">
-                        <GoldCoin size={14} />
-                        <span className="text-white text-xs font-bold">Earned £{(Math.random() * 500 + 50).toFixed(0)}</span>
-                      </div>
-                    </div>
-                    {/* Floating badge */}
-                    <div className="absolute top-2 right-2">
-                      <div className={`w-6 h-6 rounded-full bg-[#DAA520] flex items-center justify-center shadow-lg ${i % 2 === 0 ? 'animate-floatSlow' : ''}`} style={{ animationDelay: `${i * 0.5}s` }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Stats bar */}
-              <div className="flex flex-wrap justify-center gap-6 md:gap-12 mt-8 relative z-10">
-                {[
-                  { label: 'Active Shoppers', value: '125K+' },
-                  { label: 'CashTokens Earned', value: '£2.4M+' },
-                  { label: 'Partner Brands', value: '24+' },
-                  { label: 'Happy Winners', value: '8,500+' },
-                ].map((stat, i) => (
-                  <div
-                    key={i}
-                    className="text-center"
-                    style={{
-                      opacity: shoppersSection.isVisible ? 1 : 0,
-                      transform: shoppersSection.isVisible ? 'translateY(0) scale(1)' : 'translateY(30px) scale(0.9)',
-                      transition: `all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) ${0.6 + i * 0.1}s`,
-                    }}
-                  >
-                    <p className="text-xl md:text-2xl font-black text-[#7B0F14]">{stat.value}</p>
-                    <p className="text-xs text-gray-500 font-medium">{stat.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-
-            {filteredAffiliateBrands.length === 0 && (
-              <div className="text-center py-16">
-                <GoldCoin size={64} className="mx-auto mb-4 opacity-50" />
-                <p className="text-gray-500 text-lg">No brands found matching your search.</p>
-                <button
-                  onClick={() => { setSearch(''); setActiveCategory('All'); }}
-                  className="mt-4 text-[#7B0F14] font-semibold hover:underline"
-                >
-                  Clear filters
-                </button>
-              </div>
-            )}
           </div>
         )}
 
-        {/* ═══ OTHER SERVICES ═══ */}
-        {isOtherServices && (
-          <div>
+        {servicesError && !servicesLoading && (
+          <div className="rounded-2xl bg-white border border-gray-100 p-5 text-center">
+            <p className="text-gray-500 text-sm">Could not load the service catalog.</p>
+          </div>
+        )}
+
+        {!servicesLoading && !servicesError && apiServices && apiServices.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {apiServices.map((svc, i) => {
+              const ref   = (svc.serviceRef || svc.ref || '').toString();
+              const name  = (svc.title || svc.name || ref || 'Service').toString();
+              const isAirtime  = /airtime/i.test(ref) || /airtime/i.test(name);
+              const isVoucher  = /voucher|gift/i.test(ref) || /voucher|gift/i.test(name);
+              const accent     = colorFromName(ref || name);
+              const onClick    = () => {
+                if (isAirtime) {
+                  setOtherServicesTab('credit');
+                  document.getElementById('brands-grid')?.scrollIntoView({ behavior: 'smooth' });
+                } else if (isVoucher) {
+                  setOtherServicesTab('giftcard');
+                  document.getElementById('brands-grid')?.scrollIntoView({ behavior: 'smooth' });
+                }
+              };
+              return (
+                <button
+                  key={ref || i}
+                  onClick={onClick}
+                  className="group rounded-2xl bg-white border border-gray-100 p-4 text-left hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+                  style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+                >
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white mb-3" style={{ backgroundColor: accent }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      {isAirtime ? (
+                        <><rect x="5" y="2" width="14" height="20" rx="2" ry="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></>
+                      ) : isVoucher ? (
+                        <><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /></>
+                      ) : (
+                        <><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></>
+                      )}
+                    </svg>
+                  </div>
+                  <p className="text-sm font-bold text-gray-900 leading-tight">{name}</p>
+                  {svc.description && (
+                    <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{String(svc.description)}</p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="brands-grid">
+
+        <div>
             {/* Sub-Tabs */}
             <div className="flex flex-wrap gap-3 mb-8">
               {[
@@ -840,7 +560,32 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
                   ))}
                 </div>
 
-                {Object.entries(groupedGiftCardBrands).map(([category, categoryBrands], catIdx) => (
+                {/* Loading skeleton */}
+                {giftCardsLoading && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <div key={i} className="rounded-3xl overflow-hidden bg-white animate-pulse" style={{ boxShadow: '0 4px 15px rgba(0,0,0,0.06)' }}>
+                        <div className="h-28 bg-gray-200" />
+                        <div className="p-3 pt-5 space-y-2">
+                          <div className="h-3 bg-gray-200 rounded w-3/4" />
+                          <div className="h-3 bg-gray-200 rounded w-1/2" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Error */}
+                {giftCardsError && !giftCardsLoading && (
+                  <div className="text-center py-12">
+                    <GoldCoin size={56} className="mx-auto mb-3 opacity-40" />
+                    <p className="text-gray-700 font-semibold mb-1">Could not load gift cards</p>
+                    <p className="text-gray-500 text-sm">Check your connection and try again.</p>
+                  </div>
+                )}
+
+                {/* Real data */}
+                {!giftCardsLoading && !giftCardsError && Object.entries(groupedGiftCardBrands).map(([category, categoryBrands], catIdx) => (
                   <div key={category} className="mb-10">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-1.5 h-8 rounded-full bg-gradient-to-b from-[#7B0F14] to-[#DAA520]" />
@@ -859,11 +604,21 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
                         >
                           <div
                             className="h-28 flex items-center justify-center relative overflow-hidden"
-                            style={{ backgroundColor: brand.color }}
+                            style={{ backgroundColor: brand.image ? '#f3f4f6' : brand.color }}
                           >
-                            <span className="text-xl font-bold group-hover:scale-110 transition-transform duration-300" style={{ color: brand.textColor }}>
-                              {brand.logo}
-                            </span>
+                            {brand.image ? (
+                              <img
+                                src={brand.image}
+                                alt={brand.name}
+                                loading="lazy"
+                                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            ) : (
+                              <span className="text-xl font-bold group-hover:scale-110 transition-transform duration-300" style={{ color: brand.textColor }}>
+                                {brand.logo}
+                              </span>
+                            )}
                             <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 group-hover:scale-125 transition-transform duration-300">
                               <GoldCoin size={28} />
                             </div>
@@ -917,40 +672,67 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
-                  {filteredAirtimeProviders.map((provider, i) => (
-                    <button
-                      key={provider.id}
-                      onClick={() => onSelectAirtime?.(provider)}
-                      className="brand-card-enter rounded-3xl overflow-hidden bg-white text-left group hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300"
-                      style={{
-                        animationDelay: `${i * 0.08}s`,
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
-                      }}
-                    >
-                      <div
-                        className="h-28 flex items-center justify-center relative overflow-hidden"
-                        style={{ backgroundColor: provider.color }}
-                      >
-                        <span className="text-xl font-bold group-hover:scale-110 transition-transform duration-300" style={{ color: provider.textColor }}>
-                          {provider.logo}
-                        </span>
-                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 group-hover:scale-125 transition-transform duration-300">
-                          <div className="w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                              <line x1="12" y1="18" x2="12.01" y2="18" />
-                            </svg>
-                          </div>
+                {airtimeLoading && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="rounded-3xl overflow-hidden bg-white animate-pulse" style={{ boxShadow: '0 4px 15px rgba(0,0,0,0.06)' }}>
+                        <div className="h-28 bg-gray-200" />
+                        <div className="p-3 pt-5 space-y-2">
+                          <div className="h-3 bg-gray-200 rounded w-3/4" />
+                          <div className="h-3 bg-gray-200 rounded w-1/2" />
                         </div>
                       </div>
-                      <div className="p-3 pt-5">
-                        <p className="font-semibold text-gray-900 text-sm">{provider.name}</p>
-                        <p className="text-[10px] text-gray-500 mt-1">Tap to top up</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
+
+                {airtimeError && !airtimeLoading && (
+                  <div className="text-center py-12">
+                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="1.5" strokeLinecap="round" className="mx-auto mb-3 opacity-40">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    <p className="text-gray-700 font-semibold mb-1">Could not load airtime providers</p>
+                    <p className="text-gray-500 text-sm">Check your connection and try again.</p>
+                  </div>
+                )}
+
+                {!airtimeLoading && !airtimeError && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+                    {filteredAirtimeProviders.map((provider, i) => (
+                      <button
+                        key={provider.id}
+                        onClick={() => onSelectAirtime?.(provider)}
+                        className="brand-card-enter rounded-3xl overflow-hidden bg-white text-left group hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300"
+                        style={{
+                          animationDelay: `${i * 0.08}s`,
+                          boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
+                        }}
+                      >
+                        <div
+                          className="h-28 flex items-center justify-center relative overflow-hidden"
+                          style={{ backgroundColor: provider.color }}
+                        >
+                          <span className="text-xl font-bold group-hover:scale-110 transition-transform duration-300" style={{ color: provider.textColor }}>
+                            {provider.logo}
+                          </span>
+                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 group-hover:scale-125 transition-transform duration-300">
+                            <div className="w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                                <line x1="12" y1="18" x2="12.01" y2="18" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-3 pt-5">
+                          <p className="font-semibold text-gray-900 text-sm">{provider.name}</p>
+                          <p className="text-[10px] text-gray-500 mt-1">Tap to top up</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {filteredAirtimeProviders.length === 0 && (
                   <div className="text-center py-16">
@@ -991,81 +773,6 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
               </div>
             )}
           </div>
-        )}
-      </div>
-
-      {/* ═══ BRANDS CLOSE TO YOU ═══ */}
-      <div className="bg-gradient-to-b from-white to-gray-50" ref={nearYouSection.ref}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center mb-8">
-            <div
-              className="inline-flex items-center gap-2 bg-[#F4E6E6] rounded-full px-4 py-1.5 mb-3"
-              style={{
-                opacity: nearYouSection.isVisible ? 1 : 0,
-                transform: nearYouSection.isVisible ? 'translateY(0) scale(1)' : 'translateY(-20px) scale(0.9)',
-                transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s',
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="2" strokeLinecap="round">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
-              </svg>
-              <span className="text-[#7B0F14] text-xs font-bold">Near You</span>
-            </div>
-            <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-2">
-              <span className="inline-block" style={{ opacity: nearYouSection.isVisible ? 1 : 0, transform: nearYouSection.isVisible ? 'translateX(0)' : 'translateX(-80px)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s' }}>Brands</span>{' '}
-              <span className="inline-block" style={{ opacity: nearYouSection.isVisible ? 1 : 0, transform: nearYouSection.isVisible ? 'translateX(0)' : 'translateX(80px)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s' }}>Close to</span>{' '}
-              <span className="inline-block text-[#7B0F14]" style={{ opacity: nearYouSection.isVisible ? 1 : 0, transform: nearYouSection.isVisible ? 'translateX(0) scale(1)' : 'translateX(-60px) scale(0.85)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.45s' }}>You</span>
-            </h2>
-            <p
-              className="text-gray-500 text-sm"
-              style={{
-                opacity: nearYouSection.isVisible ? 1 : 0,
-                transform: nearYouSection.isVisible ? 'translateY(0)' : 'translateY(20px)',
-                transition: 'all 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.55s',
-              }}
-            >
-              Discover CashToken partner brands near popular UK locations
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {[
-              { location: 'London - Oxford Street', brands: ['Adidas UK', 'Nike UK', 'Zara UK', 'H&M'], color: '#7B0F14' },
-              { location: 'Manchester - Arndale', brands: ['ASOS', 'Primark', 'River Island', 'Boohoo'], color: '#DAA520' },
-              { location: 'Birmingham - Bullring', brands: ['John Lewis', 'Next UK', 'Currys', 'Argos'], color: '#3D0C0E' },
-              { location: 'Leeds - Trinity', brands: ['Tesco', 'ASDA', "Sainsbury's", 'M&S'], color: '#7B0F14' },
-              { location: 'Edinburgh - Princes St', brands: ['Waitrose', 'Lidl', 'Costa Coffee', 'Greggs'], color: '#DAA520' },
-              { location: 'Liverpool - Liverpool ONE', brands: ['Deliveroo', 'Uber Eats', "Nando's", 'Pizza Express'], color: '#3D0C0E' },
-              { location: 'Bristol - Cabot Circus', brands: ['Nike UK', 'ASOS', 'H&M', 'Primark'], color: '#7B0F14' },
-              { location: 'Glasgow - Buchanan St', brands: ['Adidas UK', 'Zara UK', 'Next UK', 'Currys'], color: '#DAA520' },
-              { location: 'Cardiff - St David\'s', brands: ['Tesco', 'ASDA', 'John Lewis', 'Argos'], color: '#3D0C0E' },
-              { location: 'Nottingham - Victoria', brands: ['Costa Coffee', 'Greggs', 'Deliveroo', 'Boohoo'], color: '#7B0F14' },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group brand-card-enter"
-                style={{ animationDelay: `${i * 0.1}s` }}
-              >
-                <div className="h-2 group-hover:h-3 transition-all duration-300" style={{ backgroundColor: item.color }} />
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${item.color}15` }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={item.color} strokeWidth="2" strokeLinecap="round">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
-                      </svg>
-                    </div>
-                    <p className="font-bold text-sm text-gray-900">{item.location}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {item.brands.map((brand, j) => (
-                      <span key={j} className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-[#F4E6E6] text-[#7B0F14] hover:bg-[#7B0F14] hover:text-white transition-colors cursor-pointer">{brand}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* ═══ CTA BANNER ═══ */}
@@ -1104,7 +811,7 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
             Every purchase counts. Shop with our partner brands and earn CashTokens that could be worth up to £1,000,000!
           </p>
           <button
-            onClick={() => { setActiveCategory('All'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             className="bg-[#DAA520] hover:bg-[#C4941A] text-white px-8 py-3.5 rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 inline-flex items-center gap-2"
             style={{
               opacity: ctaSection.isVisible ? 1 : 0,

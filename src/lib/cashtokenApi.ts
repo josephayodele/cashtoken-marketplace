@@ -9,13 +9,16 @@
 // After step 3, the final token replaces the subject token for all subsequent
 // authenticated calls (user-info, complete-registration, etc.).
 
-// Always use relative paths. Routing to the real upstream is handled by:
-//   - dev:  Vite proxy in vite.config.ts
-//   - prod: Vercel rewrites in vercel.json
-// If you ever deploy somewhere without a rewriting infrastructure, set
-// VITE_CASHTOKEN_API_BASE to the absolute URL and you'll need CORS allowed.
-const API_BASE: string =
-  (import.meta.env.VITE_CASHTOKEN_API_BASE as string | undefined) || '';
+// Routing to the upstream is handled by infrastructure, NOT this client:
+//   - dev:  Vite proxy in vite.config.ts (always — env var is ignored in dev)
+//   - prod: Vercel rewrites in vercel.json (when env var is unset)
+// VITE_CASHTOKEN_API_BASE is honoured only in production builds, for the
+// edge case where you deploy somewhere without rewrites and have CORS allowed
+// on the upstream. In dev we force the empty base so localhost always goes
+// through the proxy (avoids browser CORS).
+const API_BASE: string = import.meta.env.DEV
+  ? ''
+  : (import.meta.env.VITE_CASHTOKEN_API_BASE as string | undefined) || '';
 
 const API_KEY: string =
   (import.meta.env.VITE_CASHTOKEN_API_KEY as string | undefined) || '';
@@ -280,6 +283,154 @@ export async function beginSignIn(params: {
   }
   const challenge = await requestOtpChallenge(params, silent.access_token);
   return { challenge, subjectToken: silent.access_token };
+}
+
+// ─── Catalog & transactions ──────────────────────────────────────────────────
+
+// Generic shape returned by /api/.../options.json (per docs §2.2).
+export interface ServiceFieldOption {
+  const: string;        // value to send when ordering
+  description: string;  // display name
+  icon?: string;        // icon key for mobile UI
+  [key: string]: unknown;
+}
+
+// Shape captured from /api/uk/gift-card empirically — the endpoint isn't
+// documented anywhere in the spec/markdown/Postman. Each brand has multiple
+// `products` (denominations: £110, £210, £510, £1010 etc.) and one or more
+// design images on Cloudinary.
+export interface UkGiftCardDesign {
+  id: number;
+  image_url: string;
+  custom_id?: number;
+}
+
+export interface UkGiftCardBrandParams {
+  name?: string;
+  value?: number;                  // GBP face value
+  valueCurrencyCode?: string;      // 'GBP'
+  category?: string;               // 'Gift Card'
+  subCategory?: string;            // 'E-Commerce & Online Shopping'
+  subCategoryCode?: string;        // 'E-Commerce-Online-Shopping'
+  brandCode?: string;
+  productCode?: string;
+  productMoreInfoUrl?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+export interface UkGiftCardProduct {
+  id: number;
+  name: string;
+  product_id: number;
+  description?: string;
+  min_purchase: number;            // GBP minor unit? observed as whole £, e.g. 110 = £110
+  max_purchase: number;
+  expiration_date?: string;
+  brand_params?: UkGiftCardBrandParams;
+  status?: string;
+  brand_code?: string;
+}
+
+export interface UkGiftCard {
+  id: number;
+  name: string;
+  brand_code: string;
+  brand_name: string;
+  provider_id?: number;
+  description?: string;            // HTML
+  status?: string;
+  gift_card_design?: UkGiftCardDesign[];
+  products?: UkGiftCardProduct[];
+  gift_card_category?: { name?: string } | null;
+  [key: string]: unknown;
+}
+
+// Service catalog entry — fields per Service Reference table in docs §13
+// and openapi response examples. Treat extras as additive.
+export interface ServiceCatalogEntry {
+  serviceRef?: string;
+  ref?: string;
+  name?: string;
+  title?: string;
+  description?: string;
+  icon?: string;
+  enabled?: boolean;
+  [key: string]: unknown;
+}
+
+export interface TransactionRecord {
+  id?: number | string;
+  ref?: string;
+  amount?: number;
+  currency?: string;
+  status?: string;
+  type?: string;
+  description?: string;
+  createdAt?: string;
+  created_at?: string;
+  service?: { ref?: string; name?: string } | string;
+  country?: { ref?: string; code?: string } | string;
+  [key: string]: unknown;
+}
+
+// GET /api/uk/gift-card — UK voucher catalog. Auth: x-api-key only.
+export async function listUkGiftCards(): Promise<UkGiftCard[]> {
+  const raw = await request<any>('/api/uk/gift-card');
+  // The endpoint may return the array directly OR wrapped in { data: [...] }.
+  // request() already unwraps `data` when present, so we should get the array.
+  // Defensive guard for either shape:
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.items)) return raw.items;
+  if (Array.isArray(raw?.list))  return raw.list;
+  return [];
+}
+
+// GET /api/countries/:country/services/:service/fields/:field/options.json
+// Auth: x-api-key only. Used to list providers, plans, etc.
+export async function listServiceFieldOptions(params: {
+  country: string;           // 'gb', 'ng' — lowercase per docs §2.1
+  service: string;           // 'airtime', 'databundle', 'voucher', etc.
+  field: string;             // 'provider.code', 'provider.planId', ...
+  query?: Record<string, string | number>;
+}): Promise<ServiceFieldOption[]> {
+  const { country, service, field, query } = params;
+  let path = `/api/countries/${country}/services/${service}/fields/${field}/options.json`;
+  if (query) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) qs.set(k, String(v));
+    path += `?${qs.toString()}`;
+  }
+  const raw = await request<any>(path);
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.items)) return raw.items;
+  return [];
+}
+
+// GET /api/countries/:country/services/list — top-level service catalog for a country.
+export async function listCountryServices(country: string): Promise<ServiceCatalogEntry[]> {
+  const raw = await request<any>(`/api/countries/${country}/services/list`);
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.items)) return raw.items;
+  return [];
+}
+
+// GET /api/transactions/list — auth: x-api-key + Bearer (user-scoped).
+export async function listTransactions(opts: {
+  countryCode?: string;   // e.g. 'GB' (uppercase — matches filter format in docs §4.1)
+  limit?: number;
+  start?: number;
+  sort?: string;
+} = {}): Promise<TransactionRecord[]> {
+  const qs = new URLSearchParams();
+  qs.set('start', String(opts.start ?? 0));
+  qs.set('limit', String(opts.limit ?? 50));
+  qs.set('sort', opts.sort ?? 'createdAt:desc');
+  if (opts.countryCode) qs.set('filter', `country.code:${opts.countryCode}`);
+  const raw = await request<any>(`/api/transactions/list?${qs.toString()}`, { requireBearer: true });
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.items)) return raw.items;
+  return [];
 }
 
 // Sign out — client-side state cleanup.
