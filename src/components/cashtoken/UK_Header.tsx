@@ -120,20 +120,22 @@ const UK_Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSig
   const desktopCountryRef = useRef<HTMLDivElement>(null);
   const mobileCountryRef  = useRef<HTMLDivElement>(null);
 
-  // FIX 2: UK-prefixed routes so nav items don't fall through to Nigeria pages
-  // 'Home' lands on the marketplace (the new UK landing page)
-  const navItems = [
-    { label: 'Home',        page: 'uk' },
-    { label: 'Brands',      page: 'ukbrands' },
-    { label: 'Business',    page: 'ukbusiness' },
-    { label: 'News Letter', page: 'uknewsletter' },
-    { label: 'About Us',    page: 'ukteam' },
+  // UK-prefixed routes. The final item is an external link out to the
+  // corporate site — `url` opens in the same tab (literal "Back to" UX).
+  const navItems: Array<{ label: string; page?: string; url?: string }> = [
+    { label: 'Home',                     page: 'uk' },
+    { label: 'Brands',                   page: 'ukbrands' },
+    { label: 'Back to Business Website', url:  'https://cashtokenrewards.com' },
   ];
 
-  const handleNav = (page: string) => {
-    onNavigate(page);
+  const handleNav = (item: { page?: string; url?: string }) => {
     setMobileOpen(false);
     setDropdownOpen(false);
+    if (item.url) {
+      window.location.href = item.url;
+      return;
+    }
+    if (item.page) onNavigate(item.page);
   };
 
   // FIX 3: universal country routing — GL, NG, UK all work correctly
@@ -205,10 +207,10 @@ const UK_Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSig
           <nav className="hidden lg:flex items-center gap-0.5">
             {navItems.map((item) => (
               <button
-                key={item.page}
-                onClick={() => handleNav(item.page)}
+                key={item.page ?? item.url ?? item.label}
+                onClick={() => handleNav(item)}
                 className={`px-3 xl:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  currentPage === item.page
+                  item.page && currentPage === item.page
                     ? 'bg-[#7B0F14] text-white'
                     : 'text-gray-700 hover:bg-[#F4E6E6] hover:text-[#7B0F14]'
                 }`}
@@ -412,10 +414,10 @@ const UK_Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSig
           <div className="px-4 py-3 space-y-1">
             {navItems.map((item) => (
               <button
-                key={item.page}
-                onClick={() => handleNav(item.page)}
+                key={item.page ?? item.url ?? item.label}
+                onClick={() => handleNav(item)}
                 className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  currentPage === item.page ? 'bg-[#7B0F14] text-white' : 'text-gray-700 hover:bg-[#F4E6E6]'
+                  item.page && currentPage === item.page ? 'bg-[#7B0F14] text-white' : 'text-gray-700 hover:bg-[#F4E6E6]'
                 }`}
               >
                 {item.label}

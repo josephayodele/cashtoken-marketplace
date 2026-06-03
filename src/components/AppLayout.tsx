@@ -845,9 +845,7 @@ const AppLayout: React.FC = () => {
           activeSite={currentPage}
           navOverride={
             ['global', 'globalaboutus'].includes(currentPage) ? [
-              { label: 'Newsletter', page: 'newsletter' },
-              { label: 'About Us',   page: 'globalaboutus' },
-              { label: 'Contact Us', page: 'contact' },
+              { label: 'Back to Business Website', url: 'https://cashtokenrewards.com' },
             ] : undefined
           }
         />

@@ -15,7 +15,7 @@ interface HeaderProps {
   onSignInClick: () => void;
   onSignOut: () => void;
   activeSite?: string;
-  navOverride?: { label: string; page: string }[];
+  navOverride?: { label: string; page?: string; url?: string }[];
 }
 
 const NigeriaFlag = ({ w = 28, h = 20 }: { w?: number; h?: number }) => (
@@ -155,13 +155,18 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSignIn
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const navItems = navOverride ?? [
-    { label: 'Business',   page: 'merchant' },
-    { label: 'Newsletter', page: 'newsletter' },
-    { label: 'About Us',   page: 'team' },
+  const navItems: Array<{ label: string; page?: string; url?: string }> = navOverride ?? [
+    { label: 'Back to Business Website', url: 'https://cashtokenrewards.com' },
   ];
 
-  const handleNav = (page: string) => { onNavigate(page); setMobileOpen(false); };
+  const handleNav = (item: { page?: string; url?: string }) => {
+    setMobileOpen(false);
+    if (item.url) {
+      window.location.href = item.url;
+      return;
+    }
+    if (item.page) onNavigate(item.page);
+  };
 
   const handleSelect = (c: typeof COUNTRIES[0]) => {
     setSelectedCountry(c);
@@ -200,10 +205,10 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSignIn
             <nav className="hidden lg:flex items-center gap-0.5">
               {navItems.map((item) => (
                 <button
-                  key={item.page}
-                  onClick={() => handleNav(item.page)}
+                  key={item.page ?? item.url ?? item.label}
+                  onClick={() => handleNav(item)}
                   className={`px-3 xl:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    currentPage === item.page ? 'bg-[#7B0F14] text-white' : 'text-gray-700 hover:bg-[#F4E6E6] hover:text-[#7B0F14]'
+                    item.page && currentPage === item.page ? 'bg-[#7B0F14] text-white' : 'text-gray-700 hover:bg-[#F4E6E6] hover:text-[#7B0F14]'
                   }`}
                 >
                   {item.label}
@@ -394,10 +399,10 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSignIn
             <div className="px-4 py-3 space-y-1">
               {navItems.map((item) => (
                 <button
-                  key={item.page}
-                  onClick={() => handleNav(item.page)}
+                  key={item.page ?? item.url ?? item.label}
+                  onClick={() => handleNav(item)}
                   className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                    currentPage === item.page ? 'bg-[#7B0F14] text-white' : 'text-gray-700 hover:bg-[#F4E6E6]'
+                    item.page && currentPage === item.page ? 'bg-[#7B0F14] text-white' : 'text-gray-700 hover:bg-[#F4E6E6]'
                   }`}
                 >
                   {item.label}
