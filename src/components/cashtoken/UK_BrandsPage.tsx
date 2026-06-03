@@ -21,6 +21,65 @@ const shopperImages = [
 ];
 const heroBanner = 'https://d64gsuwffb70l.cloudfront.net/698c74038d655b8d24d48fd8_1772110535174_8e9fba49.jpg';
 
+// ─── Marketing chrome ───
+// `hotDeals` is intentional hardcoded promo copy — NOT a catalog. It powers
+// the deal-ticker and floating brand-badge animations in the hero. Real
+// catalog data (gift cards / airtime / services) is fetched live from the
+// middleware further down.
+const hotDeals = [
+  { brand: 'ASOS',         deal: 'Buy 2 Get 1 Free',       color: '#2D2D2D', textColor: '#fff',     logo: 'ASOS' },
+  { brand: "Nando's",      deal: 'Free Starter with Main', color: '#E31837', textColor: '#fff',     logo: "Nando's" },
+  { brand: 'Deliveroo',    deal: 'Free Delivery Today',    color: '#00CCBC', textColor: '#fff',     logo: 'deliveroo' },
+  { brand: 'Temu',         deal: 'Up to 90% OFF',          color: '#FB6F20', textColor: '#fff',     logo: 'Temu' },
+  { brand: 'Costa Coffee', deal: 'Double Points Week',     color: '#6B0F24', textColor: '#fff',     logo: 'COSTA' },
+  { brand: 'Greggs',       deal: '£1 Sausage Rolls',       color: '#004B8D', textColor: '#FF6600',  logo: 'GREGGS' },
+  { brand: 'H&M',          deal: '30% OFF Everything',     color: '#E50010', textColor: '#fff',     logo: 'H&M' },
+  { brand: 'Uber Eats',    deal: '£5 OFF First Order',     color: '#142328', textColor: '#06C167',  logo: 'UberEats' },
+];
+
+const DealPopup: React.FC<{ deal: typeof hotDeals[number]; index: number; onClose: () => void }> = ({ deal, index, onClose }) => {
+  const positions = [
+    'top-20 right-4', 'top-40 left-4', 'top-60 right-8', 'bottom-40 left-8',
+    'top-32 right-12', 'bottom-60 right-4', 'top-48 left-12', 'bottom-32 left-4',
+  ];
+  return (
+    <div className={`fixed z-50 ${positions[index % positions.length]} animate-dealPopIn`} style={{ animationDelay: `${index * 0.3}s` }}>
+      <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-3 max-w-[200px] relative overflow-hidden">
+        <button onClick={onClose} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: deal.color }}>
+            <span className="text-[8px] font-bold" style={{ color: deal.textColor }}>{deal.logo}</span>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-900 leading-tight">{deal.brand}</p>
+            <p className="text-[9px] text-[#7B0F14] font-semibold">{deal.deal}</p>
+          </div>
+        </div>
+        <div className="h-0.5 rounded-full bg-gradient-to-r from-[#DAA520] via-[#7B0F14] to-[#DAA520] animate-shimmerBar" />
+      </div>
+    </div>
+  );
+};
+
+const DealsTicker: React.FC = () => (
+  <div className="overflow-hidden bg-gradient-to-r from-[#7B0F14] via-[#A52228] to-[#7B0F14] py-2.5 relative">
+    <div className="flex animate-ticker whitespace-nowrap">
+      {[...hotDeals, ...hotDeals, ...hotDeals].map((deal, i) => (
+        <div key={i} className="inline-flex items-center gap-2 mx-6">
+          <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ backgroundColor: deal.color }}>
+            <span className="text-[7px] font-bold" style={{ color: deal.textColor }}>{deal.logo}</span>
+          </div>
+          <span className="text-white/90 text-xs font-medium">{deal.brand}:</span>
+          <span className="text-[#DAA520] text-xs font-bold">{deal.deal}</span>
+          <span className="text-white/30 mx-2">|</span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 // ─── Gift Card Brands ───
 // All brand data is fetched live from /api/uk/gift-card. No hardcoded fallback.
 
@@ -92,11 +151,10 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
   const [gcCategory, setGcCategory] = useState('All');
   const [gcDropdownOpen, setGcDropdownOpen] = useState(false);
   const [airSearch, setAirSearch] = useState('');
-  const [mounted, setMounted] = useState(false);
   const [heroLoaded, setHeroLoaded] = useState(false);
+  const [activeDealPopups, setActiveDealPopups] = useState<number[]>([]);
 
   // Scroll-triggered section refs
-  const shoppersSection = useInView(0.08);
   const ctaSection = useInView(0.1);
 
   // Fetch the real UK gift-card catalog from the middleware. No fallback —
@@ -198,10 +256,27 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
     return ['All', ...Array.from(cats)];
   }, [effectiveGiftCardBrands]);
   useEffect(() => {
-    setMounted(true);
     const heroTimer = setTimeout(() => setHeroLoaded(true), 100);
     return () => { clearTimeout(heroTimer); };
   }, []);
+
+  // Cycle the floating marketing deal popups (ASOS, Nando's, etc.).
+  useEffect(() => {
+    let popupIndex = 0;
+    const interval = setInterval(() => {
+      setActiveDealPopups((prev) => {
+        const next = [...prev, popupIndex % hotDeals.length];
+        if (next.length > 3) next.shift();
+        return next;
+      });
+      popupIndex++;
+    }, 3000);
+    const firstTimer = setTimeout(() => setActiveDealPopups([0]), 2000);
+    return () => { clearInterval(interval); clearTimeout(firstTimer); };
+  }, []);
+
+  const closeDealPopup = (idx: number) =>
+    setActiveDealPopups((prev) => prev.filter((i) => i !== idx));
 
   const filteredGiftCardBrands = useMemo(() => {
     return effectiveGiftCardBrands.filter((b) => {
@@ -303,6 +378,16 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
         }
       `}</style>
 
+      {/* ═══ DEAL POPUPS (floating marketing chrome) ═══ */}
+      {activeDealPopups.map((dealIdx) => (
+        <DealPopup
+          key={`popup-${dealIdx}`}
+          deal={hotDeals[dealIdx]}
+          index={dealIdx}
+          onClose={() => closeDealPopup(dealIdx)}
+        />
+      ))}
+
       {/* Back Button */}
       {onBack && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
@@ -324,29 +409,29 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
           <div className="max-w-xl animate-heroSlideUp">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 mb-4">
               <GoldCoin size={18} />
-              <span className="text-white/90 text-xs font-medium">Earn CashTokens on every purchase</span>
+              <span className="text-white/90 text-xs font-medium">Receive CashTokens on every purchase</span>
             </div>
             <h1 className="text-3xl md:text-5xl font-black text-white mb-3 leading-tight">
               <span className="inline-block" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? 'translateX(0)' : 'translateX(-80px)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s' }}>Shop.</span>{' '}
-              <span className="inline-block" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? 'translateX(0)' : 'translateX(80px)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s' }}>Earn.</span>{' '}
+              <span className="inline-block" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? 'translateX(0)' : 'translateX(80px)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s' }}>Receive.</span>{' '}
               <span className="inline-block text-[#DAA520]" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? 'translateX(0) scale(1)' : 'translateX(-60px) scale(0.8)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s' }}>Win Big.</span>
             </h1>
 
             <p className="text-white/80 text-sm md:text-base mb-6 max-w-md">
-              Buy gift cards and top up airtime — every purchase earns you CashTokens.
+              Discover amazing deals from top UK brands. Every purchase over £50 earns you CashTokens worth up to £1,000,000!
             </p>
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => { setOtherServicesTab('giftcard'); document.getElementById('brands-grid')?.scrollIntoView({ behavior: 'smooth' }); }}
+                onClick={() => document.getElementById('brands-grid')?.scrollIntoView({ behavior: 'smooth' })}
                 className="bg-[#DAA520] hover:bg-[#C4941A] text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
-                Browse Gift Cards
+                Explore Brands
               </button>
               <button
-                onClick={() => { setOtherServicesTab('credit'); document.getElementById('brands-grid')?.scrollIntoView({ behavior: 'smooth' }); }}
+                onClick={() => { setOtherServicesTab('giftcard'); document.getElementById('brands-grid')?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all border border-white/20"
               >
-                Top Up Airtime
+                Gift Cards & More
               </button>
             </div>
           </div>
@@ -366,6 +451,9 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
           </div>
         </div>
       </div>
+
+      {/* ═══ DEALS TICKER (marketing chrome) ═══ */}
+      <DealsTicker />
 
       {/* ═══ EARN BANNER ═══ */}
       <div className="bg-gradient-to-r from-[#F4E6E6] via-white to-[#F4E6E6] py-4 px-4">
