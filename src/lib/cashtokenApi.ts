@@ -120,16 +120,19 @@ async function request<T>(
   }
 
   if (!res.ok) {
+    // VAS API errors:  { errorMessage, errorDescription, errorCode }
+    // Core API errors: { error: { code, message } }
     const message =
       payload?.errorMessage ||
       payload?.errorDescription ||
+      payload?.error?.message ||
       payload?.message ||
       `Request failed (${res.status})`;
     throw new CashtokenApiError(
       res.status,
       message,
-      payload?.errorCode,
-      payload?.errorDescription,
+      payload?.errorCode ?? payload?.error?.code,
+      payload?.errorDescription ?? payload?.error?.message,
     );
   }
 
@@ -431,6 +434,226 @@ export async function listTransactions(opts: {
   if (Array.isArray(raw)) return raw;
   if (Array.isArray(raw?.items)) return raw.items;
   return [];
+}
+
+// ─── Orders & payments (unified order flow) ──────────────────────────────────
+// Spec: v2_technical_api_documentation §3 (Order Lifecycle & Fulfillment) and
+// §15 (Complete Order Flow). All services share this flow:
+//   initialize → get-payment-method → set-payment-method → poll summary.
+// Auth: /orders/initialize needs Bearer + x-api-key; the rest need x-api-key
+// (request() attaches the stored Bearer too, which is harmless).
+
+// Order as returned by /orders/initialize (§3.1.8 sample).
+export interface Order {
+  ref: string;
+  amount?: number;
+  fee?: number;
+  total?: number;
+  status?: string;       // 'pending' | 'processing' | 'successful' | 'failed' | ...
+  [key: string]: unknown;
+}
+
+// Payment method option (§3.2). `name` is the machine name passed back as
+// `option` to set-payment-method (e.g. 'flutterwave-ng', 'reward-wallet').
+export interface PaymentMethod {
+  id: number;
+  ref: string;
+  gateway: string;           // e.g. 'cashtoken'
+  icon?: string;             // 'pay-with-card' | 'reward-wallet'
+  title: string;             // display name
+  name: string;              // machine name -> `option`
+  enabled: boolean;
+  description?: string | null;
+  listOrder?: number;
+  subtitleType?: 'icon' | 'balance' | string;
+  subtitleValue?: string;
+  minimumAmount?: number | null;
+  maximumAmount?: number | null;   // 0 = unlimited
+  mfaLength?: number | null;       // e.g. 4 for reward wallet PIN
+  mfaType?: string | null;         // 'PIN'
+  mfaLabel?: string | null;
+  [key: string]: unknown;
+}
+
+// set-payment-method response (§3.3). `continuationLink` present => card flow
+// requires opening the gateway (3-D Secure) before the order resolves.
+export interface SetPaymentResult {
+  ref: string;
+  gateway?: string;
+  amount?: string | number;
+  option?: string;
+  continuationLink?: string;
+  returnUrl?: string;
+  [key: string]: unknown;
+}
+
+// Order-init request shape (§3.1). `params`/`request` mirror the docs verbatim.
+export interface InitializeOrderInput {
+  params: Record<string, unknown>;
+  request: {
+    requestRef: string;
+    serviceRef: string;      // 'airtime' | 'databundle' | 'voucher' | ...
+    countryRef: string;      // 'gb' | 'ng' — lowercase per docs
+    validation?: boolean;
+    addAsBeneficiary?: boolean;
+    beneficiaryLabel?: string;
+    beneficiaryRef?: string;
+    [key: string]: unknown;
+  };
+}
+
+function newRequestRef(): string {
+  return (crypto as any).randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+// POST /api/orders/initialize — creates a pending order, returns the order ref.
+// Auth: Bearer + x-api-key.
+export async function initializeOrder(input: InitializeOrderInput): Promise<Order> {
+  const raw = await request<any>('/api/orders/initialize', {
+    method: 'POST',
+    body: input,
+    requireBearer: true,
+  });
+  // request() unwraps top-level `data`; the order sits at data.order.
+  return (raw?.order ?? raw) as Order;
+}
+
+// Convenience wrapper for a GB airtime order. Amount is in whole pounds
+// (docs §3.1.2 shows amount: 60 for £60, unlike NG's minor units).
+export async function initializeUkAirtimeOrder(params: {
+  providerCode: string;      // provider.code, e.g. '9457:67'
+  amount: number;            // whole GBP
+  recipient: string;         // phone/identifier the airtime tops up
+}): Promise<Order> {
+  return initializeOrder({
+    params: {
+      provider: { code: params.providerCode },
+      amount: params.amount,
+      recipient: params.recipient,
+    },
+    request: {
+      requestRef: newRequestRef(),
+      serviceRef: 'airtime',
+      countryRef: 'gb',
+      validation: false,
+    },
+  });
+}
+
+// GET /api/orders/:ref/get-payment-method — available options for an order.
+// Auth: x-api-key. Sorted by listOrder for stable display.
+export async function getPaymentMethods(orderRef: string): Promise<PaymentMethod[]> {
+  const raw = await request<any>(`/api/orders/${orderRef}/get-payment-method`);
+  const list: PaymentMethod[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.items)
+    ? raw.items
+    : [];
+  return [...list].sort((a, b) => (a.listOrder ?? 0) - (b.listOrder ?? 0));
+}
+
+// POST /api/orders/:ref/set-payment-method — selects an option and starts payment.
+// Card:   { option, gateway, returnUrl }              -> continuationLink
+// Wallet: { option, gateway, returnUrl, value: PIN }  -> completes immediately
+// Auth: x-api-key.
+export async function setPaymentMethod(
+  orderRef: string,
+  input: { option: string; gateway: string; returnUrl: string; value?: string },
+): Promise<SetPaymentResult> {
+  return request<SetPaymentResult>(`/api/orders/${orderRef}/set-payment-method`, {
+    method: 'POST',
+    body: input,
+  });
+}
+
+// GET /api/orders/:ref/summary — poll after payment to learn the final status.
+// Auth: x-api-key.
+export async function getOrderSummary(orderRef: string): Promise<Order> {
+  const raw = await request<any>(`/api/orders/${orderRef}/summary`);
+  return (raw?.order ?? raw) as Order;
+}
+
+// Statuses that mean the order is done (one way or the other). Anything else
+// (pending/processing/initiated) means keep polling.
+export function isTerminalOrderStatus(status?: string): boolean {
+  const s = (status || '').toLowerCase();
+  return ['successful', 'success', 'completed', 'complete', 'failed', 'failure', 'cancelled', 'canceled', 'declined'].includes(s);
+}
+
+export function isSuccessfulOrderStatus(status?: string): boolean {
+  const s = (status || '').toLowerCase();
+  return ['successful', 'success', 'completed', 'complete'].includes(s);
+}
+
+// ─── Account & wallets (Core API) ────────────────────────────────────────────
+// Spec: v2_technical_api_documentation §6. The Core API lives on a different
+// host (api[-sandbox].cashtoken.africa/v2) than the VAS API. We reach it via a
+// same-origin `/coreapi` prefix wired in vite.config.ts (dev proxy) and
+// vercel.json (prod rewrite), both mapping /coreapi/* -> {core-host}/v2/*.
+// Auth: Bearer token (request() also attaches x-api-key, which is harmless).
+const CORE_PREFIX = '/coreapi';
+
+// The wallet response shape isn't sampled anywhere in the spec/Postman, so this
+// parser is deliberately tolerant of field-name variants.
+export interface WalletRecord {
+  ref?: string;
+  type?: string;                 // e.g. 'reward', 'main'
+  name?: string;
+  currency?: string;             // 'GBP', 'NGN', ...
+  currencyCode?: string;
+  balance?: number | string;
+  availableBalance?: number | string;
+  ledgerBalance?: number | string;
+  amount?: number | string;
+  isDefault?: boolean;
+  [key: string]: unknown;
+}
+
+function toNumber(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const n = Number(v.replace(/[^\d.-]/g, ''));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+// Extract a spendable balance from a wallet, trying the likely field names.
+export function walletBalanceOf(w: WalletRecord): number | null {
+  return (
+    toNumber(w.availableBalance) ??
+    toNumber(w.balance) ??
+    toNumber(w.amount) ??
+    toNumber(w.ledgerBalance)
+  );
+}
+
+function walletCurrencyOf(w: WalletRecord): string {
+  return String(w.currency ?? w.currencyCode ?? '').toUpperCase();
+}
+
+// GET /coreapi/account/wallets/ — the signed-in user's wallets. Auth: Bearer.
+export async function getAccountWallets(): Promise<WalletRecord[]> {
+  const raw = await request<any>(`${CORE_PREFIX}/account/wallets/`, { requireBearer: true });
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.items)) return raw.items;
+  if (Array.isArray(raw?.wallets)) return raw.wallets;
+  return [];
+}
+
+// Convenience: the spendable balance for a preferred currency (defaults to the
+// default wallet, else the first wallet). Returns null if none is readable.
+export async function getWalletBalance(preferredCurrency?: string): Promise<number | null> {
+  const wallets = await getAccountWallets();
+  if (wallets.length === 0) return null;
+  const want = (preferredCurrency || '').toUpperCase();
+  const pick =
+    (want && wallets.find((w) => walletCurrencyOf(w) === want)) ||
+    wallets.find((w) => w.isDefault) ||
+    wallets[0];
+  return pick ? walletBalanceOf(pick) : null;
 }
 
 // Sign out — client-side state cleanup.

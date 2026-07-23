@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { listServiceFieldOptions } from '@/lib/cashtokenApi';
 
 import GoldCoin from './GoldCoin';
 
@@ -90,21 +92,26 @@ const giftCardBrands = [
   { id: 24, name: 'Lidl', category: 'Groceries', price: '£5.00', color: '#0050AA', textColor: '#FFF000', logo: 'LIDL' },
 ];
 
-// ─── UK Airtime Providers ───
-const airtimeProviders = [
-  { id: 201, name: 'EE', color: '#007B85', textColor: '#FFCB05', logo: 'EE' },
-  { id: 202, name: 'Vodafone', color: '#E60000', textColor: '#fff', logo: 'vodafone' },
-  { id: 203, name: 'Three', color: '#000', textColor: '#FF6900', logo: 'Three' },
-  { id: 204, name: 'O2', color: '#0019A5', textColor: '#fff', logo: 'O2' },
-  { id: 205, name: 'giffgaff', color: '#000', textColor: '#37B34A', logo: 'giffgaff' },
-  { id: 206, name: 'Tesco Mobile', color: '#00539F', textColor: '#E31837', logo: 'Tesco' },
-  { id: 207, name: 'Sky Mobile', color: '#0072C9', textColor: '#fff', logo: 'Sky' },
-  { id: 208, name: 'Virgin Media', color: '#C3092D', textColor: '#fff', logo: 'Virgin' },
-  { id: 209, name: 'BT Mobile', color: '#5514B4', textColor: '#fff', logo: 'BT' },
-  { id: 210, name: 'Lebara', color: '#E4007C', textColor: '#fff', logo: 'Lebara' },
-  { id: 211, name: 'Lycamobile', color: '#003DA5', textColor: '#FFD700', logo: 'Lyca' },
-  { id: 212, name: 'VOXI', color: '#FF6B00', textColor: '#fff', logo: 'VOXI' },
-];
+// ─── Airtime Providers ───
+// Fetched live from /api/countries/gb/services/airtime/fields/provider.code/options.json
+// (same source as UK_BrandsPage). provider.id carries the real provider.code.
+type AirtimeProvider = {
+  id: string;       // provider.code value (e.g. "9457:67")
+  name: string;     // description
+  color: string;
+  textColor: string;
+  logo: string;
+  icon?: string;    // raw icon key from API
+};
+
+// Deterministic colour from provider name so the same provider always looks the
+// same across renders, without a hand-curated lookup table.
+const AIRTIME_PALETTE = ['#1F2937', '#7C2D12', '#1E40AF', '#831843', '#365314', '#0E7490', '#7C3AED', '#9A3412', '#0F766E', '#5B21B6'];
+function colorFromName(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return AIRTIME_PALETTE[Math.abs(h) % AIRTIME_PALETTE.length];
+}
 
 const categories = ['All', 'Lifestyle', 'Foodie', 'Fashion', 'Groceries', 'Other Services'];
 
@@ -188,6 +195,23 @@ const BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirtime,
   const giftCardCategories = ['All', 'Lifestyle', 'Foodie', 'Fashion', 'Groceries'];
   const isOtherServices = activeCategory === 'Other Services';
 
+  // Fetch the real airtime provider list. No fallback — the UI shows
+  // loading/error/empty states explicitly.
+  const {
+    data: apiAirtime,
+    isLoading: airtimeLoading,
+    isError:   airtimeError,
+  } = useQuery({
+    queryKey: ['airtime-providers', 'gb'],
+    queryFn: () => listServiceFieldOptions({
+      country: 'gb',
+      service: 'airtime',
+      field:   'provider.code',
+    }),
+    staleTime: 10 * 60_000,
+    retry: 1,
+  });
+
   // Entrance animation
   useEffect(() => {
     setMounted(true);
@@ -264,11 +288,27 @@ const BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirtime,
     return groups;
   }, [filteredGiftCardBrands, gcCategory]);
 
+  // Normalise options.json items to the AirtimeProvider shape used by the UI.
+  const effectiveAirtimeProviders: AirtimeProvider[] = useMemo(() => {
+    if (!apiAirtime) return [];
+    return apiAirtime.map((opt) => {
+      const name = (opt.description || String(opt.const)).toString();
+      return {
+        id:        String(opt.const),
+        name,
+        color:     colorFromName(name),
+        textColor: '#fff',
+        logo:      (opt.icon as string) || name.split(' ').map(w => w[0]).join('').slice(0, 4).toUpperCase(),
+        icon:      opt.icon as string | undefined,
+      };
+    });
+  }, [apiAirtime]);
+
   const filteredAirtimeProviders = useMemo(() => {
-    return airtimeProviders.filter((p) =>
+    return effectiveAirtimeProviders.filter((p) =>
       p.name.toLowerCase().includes(airSearch.toLowerCase())
     );
-  }, [airSearch]);
+  }, [effectiveAirtimeProviders, airSearch]);
 
   return (
     <div className="bg-white min-h-screen relative">
@@ -847,54 +887,85 @@ const BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirtime,
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
-                  {filteredAirtimeProviders.map((provider, i) => (
-                    <button
-                      key={provider.id}
-                      onClick={() => onSelectAirtime?.(provider)}
-                      className="brand-card-enter rounded-3xl overflow-hidden bg-white text-left group hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300"
-                      style={{
-                        animationDelay: `${i * 0.08}s`,
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
-                      }}
-                    >
-                      <div
-                        className="h-28 flex items-center justify-center relative overflow-hidden"
-                        style={{ backgroundColor: provider.color }}
-                      >
-                        <span className="text-xl font-bold group-hover:scale-110 transition-transform duration-300" style={{ color: provider.textColor }}>
-                          {provider.logo}
-                        </span>
-                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 group-hover:scale-125 transition-transform duration-300">
-                          <div className="w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                              <line x1="12" y1="18" x2="12.01" y2="18" />
-                            </svg>
-                          </div>
+                {airtimeLoading && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="rounded-3xl overflow-hidden bg-white animate-pulse" style={{ boxShadow: '0 4px 15px rgba(0,0,0,0.06)' }}>
+                        <div className="h-28 bg-gray-200" />
+                        <div className="p-3 pt-5 space-y-2">
+                          <div className="h-3 bg-gray-200 rounded w-3/4" />
+                          <div className="h-3 bg-gray-200 rounded w-1/2" />
                         </div>
                       </div>
-                      <div className="p-3 pt-5">
-                        <p className="font-semibold text-gray-900 text-sm">{provider.name}</p>
-                        <p className="text-[10px] text-gray-500 mt-1">Tap to top up</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
 
-                {filteredAirtimeProviders.length === 0 && (
+                {airtimeError && !airtimeLoading && (
+                  <div className="text-center py-12">
+                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="1.5" strokeLinecap="round" className="mx-auto mb-3 opacity-40">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    <p className="text-gray-700 font-semibold mb-1">Could not load airtime providers</p>
+                    <p className="text-gray-500 text-sm">Check your connection and try again.</p>
+                  </div>
+                )}
+
+                {!airtimeLoading && !airtimeError && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
+                    {filteredAirtimeProviders.map((provider, i) => (
+                      <button
+                        key={provider.id}
+                        onClick={() => onSelectAirtime?.(provider)}
+                        className="brand-card-enter rounded-3xl overflow-hidden bg-white text-left group hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300"
+                        style={{
+                          animationDelay: `${i * 0.08}s`,
+                          boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
+                        }}
+                      >
+                        <div
+                          className="h-28 flex items-center justify-center relative overflow-hidden"
+                          style={{ backgroundColor: provider.color }}
+                        >
+                          <span className="text-xl font-bold group-hover:scale-110 transition-transform duration-300" style={{ color: provider.textColor }}>
+                            {provider.logo}
+                          </span>
+                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 group-hover:scale-125 transition-transform duration-300">
+                            <div className="w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                                <line x1="12" y1="18" x2="12.01" y2="18" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-3 pt-5">
+                          <p className="font-semibold text-gray-900 text-sm">{provider.name}</p>
+                          <p className="text-[10px] text-gray-500 mt-1">Tap to top up</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {!airtimeLoading && !airtimeError && filteredAirtimeProviders.length === 0 && (
                   <div className="text-center py-16">
                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="1.5" strokeLinecap="round" className="mx-auto mb-4 opacity-30">
                       <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
                       <line x1="12" y1="18" x2="12.01" y2="18" />
                     </svg>
-                    <p className="text-gray-500 text-lg">No providers found matching your search.</p>
-                    <button
-                      onClick={() => setAirSearch('')}
-                      className="mt-4 text-[#7B0F14] font-semibold hover:underline"
-                    >
-                      Clear search
-                    </button>
+                    <p className="text-gray-500 text-lg">
+                      {airSearch ? 'No providers found matching your search.' : 'No airtime providers are available right now.'}
+                    </p>
+                    {airSearch && (
+                      <button
+                        onClick={() => setAirSearch('')}
+                        className="mt-4 text-[#7B0F14] font-semibold hover:underline"
+                      >
+                        Clear search
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

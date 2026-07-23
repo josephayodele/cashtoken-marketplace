@@ -10,6 +10,10 @@ import path from "path";
 //     Only used directly for /oauth/token/introspect.
 // All /idp/* and /api/* calls in this app should target the VAS API host.
 const VAS_SANDBOX = 'https://vasapi-sandbox.cashtoken.africa';
+// Core API (account/wallets, accounts, phones, gifting) lives on a DIFFERENT
+// host per docs §6. We expose it under a same-origin /coreapi prefix that maps
+// to the upstream's /v2 base, mirroring the /api and /idp proxying.
+const CORE_SANDBOX = 'https://api-sandbox.cashtoken.africa';
 
 export default defineConfig(() => ({
   server: {
@@ -27,6 +31,13 @@ export default defineConfig(() => ({
         target: VAS_SANDBOX,
         changeOrigin: true,
         secure: true,
+      },
+      // /coreapi/* -> {CORE_SANDBOX}/v2/*
+      '/coreapi': {
+        target: CORE_SANDBOX,
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/coreapi/, '/v2'),
       },
     },
   },

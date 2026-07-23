@@ -10,6 +10,10 @@
       "destination": "https://vasapi-sandbox.cashtoken.africa/api/:path*"
     },
     {
+      "source": "/coreapi/:path*",
+      "destination": "https://api-sandbox.cashtoken.africa/v2/:path*"
+    },
+    {
       "source": "/((?!_next|static|favicon\\.ico|logos|images|assets|.*\\..*).*)",
       "destination": "/index.html"
     }

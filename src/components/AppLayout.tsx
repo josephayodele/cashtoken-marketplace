@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import {
   getRememberedSubject,
   getUserInfo,
+  getWalletBalance,
   hasStoredSession,
   listTransactions,
   signOut,
@@ -144,15 +145,30 @@ const AppLayout: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // Pull transactions whenever the signed-in user (or current site) changes.
+  // Pull transactions + wallet balance whenever the signed-in user (or current
+  // site) changes.
   useEffect(() => {
     if (user && !isDemoUser) {
       loadTransactions();
+      loadWalletBalance();
     } else {
       setTransactions([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isDemoUser, isUKSite]);
+
+  // Fetch the real wallet balance from the Core API. Currency follows the
+  // current site (GBP on UK, NGN elsewhere). Silent no-op on failure so the
+  // existing balance is preserved rather than flashing to 0.
+  const loadWalletBalance = async () => {
+    if (!user || isDemoUser) return;
+    try {
+      const balance = await getWalletBalance(isUKSite ? 'GBP' : 'NGN');
+      if (balance != null) setWalletBalance(balance);
+    } catch (err) {
+      console.warn('Failed to load wallet balance:', err);
+    }
+  };
 
   // Transactions are fetched from the Cashtoken VAS middleware.
   // Filtered by current site's country code (GB on UK, NG elsewhere).
@@ -274,7 +290,9 @@ const AppLayout: React.FC = () => {
     const isDemo = profile.id === 'demo-user-001';
     setIsDemoUser(isDemo);
     setUser(profile);
-    setWalletBalance(1247.50);
+    // Demo user keeps the canned balance; real users get their live Core API
+    // balance via the loadWalletBalance effect (keyed on user id).
+    if (isDemo) setWalletBalance(1247.50);
     setTransactions([]);
     setProfileForm((prev) => ({ ...prev, full_name: profile.full_name }));
   };
