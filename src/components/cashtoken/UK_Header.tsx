@@ -297,24 +297,6 @@ const UK_Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSig
                 </button>
               )}
             </div>
-
-            {/* Desktop country selector — own ref and state */}
-            <div className="relative ml-3" ref={desktopCountryRef}>
-              <button
-                onClick={() => setDesktopCountryOpen(v => !v)}
-                className="flex items-center gap-1.5 hover:opacity-80 transition-opacity focus:outline-none"
-              >
-                <SelectedFlag w={28} h={19} />
-                <span className="text-sm font-medium text-gray-700">{selectedCountry.name}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2.5" strokeLinecap="round"
-                  style={{ transform: desktopCountryOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-              {desktopCountryOpen && (
-                <CountryDropdown selected={selectedCountry} onSelect={handleCountrySelect} />
-              )}
-            </div>
           </nav>
 
           {/* Mobile right section */}
@@ -334,23 +316,6 @@ const UK_Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSig
                 Sign In
               </button>
             )}
-
-            {/* Mobile country selector — own ref and state */}
-            <div className="relative" ref={mobileCountryRef}>
-              <button
-                onClick={() => setMobileCountryOpen(v => !v)}
-                className="flex items-center gap-1 hover:opacity-80 transition-opacity focus:outline-none"
-              >
-                <SelectedFlag w={22} h={15} />
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2.5" strokeLinecap="round"
-                  style={{ transform: mobileCountryOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-              {mobileCountryOpen && (
-                <CountryDropdown selected={selectedCountry} onSelect={handleCountrySelect} />
-              )}
-            </div>
 
             <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
               {mobileOpen ? (
@@ -423,10 +388,6 @@ const UK_Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSig
                 {item.label}
               </button>
             ))}
-            <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100 mt-2">
-              <SelectedFlag w={24} h={16} />
-              <span className="text-sm text-gray-600">{selectedCountry.name}</span>
-            </div>
           </div>
         </div>
       )}

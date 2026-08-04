@@ -252,16 +252,16 @@ const UK_MarketplacePage: React.FC<MarketplacePageProps> = ({ onBack, onViewBran
             </p>
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => onViewBrands?.()}
+                onClick={() => document.getElementById('gift-cards')?.scrollIntoView({ behavior: 'smooth' })}
                 className="bg-[#DAA520] hover:bg-[#C4941A] text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
-                Explore Brands
+                Gift Card Brands
               </button>
               <button
-                onClick={() => onViewBrands?.()}
+                onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}
                 className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all border border-white/20"
               >
-                Gift Cards & More
+                Buy Airtime
               </button>
             </div>
           </div>
@@ -297,8 +297,8 @@ const UK_MarketplacePage: React.FC<MarketplacePageProps> = ({ onBack, onViewBran
         </div>
       </div>
 
-      {/* ─── SERVICES ─── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      {/* ─── SERVICES (Airtime lives here — target of the "Buy Airtime" hero button) ─── */}
+      <section id="services" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 scroll-mt-24">
         <div className="mb-5">
           <p className="text-[10px] font-bold text-[#DAA520] uppercase tracking-[0.2em] mb-1">Available in the UK</p>
           <h2 className="text-xl sm:text-2xl font-black text-gray-900">Services</h2>
@@ -355,8 +355,8 @@ const UK_MarketplacePage: React.FC<MarketplacePageProps> = ({ onBack, onViewBran
         )}
       </section>
 
-      {/* ─── FEATURED GIFT CARDS ─── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+      {/* ─── FEATURED GIFT CARDS (target of the "Gift Card Brands" hero button) ─── */}
+      <section id="gift-cards" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 scroll-mt-24">
         <div className="flex items-end justify-between mb-5">
           <div>
             <p className="text-[10px] font-bold text-[#DAA520] uppercase tracking-[0.2em] mb-1">Buy & earn</p>
