@@ -244,24 +244,24 @@ const UK_MarketplacePage: React.FC<MarketplacePageProps> = ({ onBack, onViewBran
             <h1 className="text-3xl md:text-5xl font-black text-white mb-3 leading-tight">
               <span className="inline-block" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? 'translateX(0)' : 'translateX(-80px)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s' }}>Shop.</span>{' '}
               <span className="inline-block" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? 'translateX(0)' : 'translateX(80px)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s' }}>Receive.</span>{' '}
-              <span className="inline-block text-[#DAA520]" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? 'translateX(0) scale(1)' : 'translateX(-60px) scale(0.8)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s' }}>Win Big.</span>
+              <span className="inline-block text-[#DAA520]" style={{ opacity: heroLoaded ? 1 : 0, transform: heroLoaded ? 'translateX(0) scale(1)' : 'translateX(-60px) scale(0.8)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s' }}>Win big.</span>
             </h1>
 
             <p className="text-white/80 text-sm md:text-base mb-6 max-w-md">
-              Discover amazing deals from top UK brands. Every purchase over £50 earns you CashTokens worth up to £1,000,000!
+              Every purchase over £50 earns CashTokens.
             </p>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => document.getElementById('gift-cards')?.scrollIntoView({ behavior: 'smooth' })}
                 className="bg-[#DAA520] hover:bg-[#C4941A] text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
               >
-                Gift Card Brands
+                Shop and earn
               </button>
               <button
                 onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}
                 className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all border border-white/20"
               >
-                Buy Airtime
+                Airtime
               </button>
             </div>
           </div>
