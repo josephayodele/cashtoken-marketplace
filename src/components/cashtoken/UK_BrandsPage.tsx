@@ -388,16 +388,6 @@ const UK_BrandsPage: React.FC<BrandsPageProps> = ({ onSelectBrand, onSelectAirti
         />
       ))}
 
-      {/* Back Button */}
-      {onBack && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-          <button onClick={onBack} className="flex items-center gap-2 text-gray-600 hover:text-[#7B0F14] transition-colors group">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="group-hover:-translate-x-1 transition-transform"><polyline points="15 18 9 12 15 6" /></svg>
-            <span className="text-sm font-medium">Back to Home</span>
-          </button>
-        </div>
-      )}
-
       {/* ═══ HERO BANNER ═══ */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0">
