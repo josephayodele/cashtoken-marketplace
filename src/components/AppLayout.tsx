@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { pathForState, stateForPath } from '@/lib/pageRoutes';
 import {
   getRememberedSubject,
   getUserInfo,
@@ -91,6 +93,30 @@ const AppLayout: React.FC = () => {
   const [profileForm, setProfileForm] = useState({ full_name: '', saving: false, saved: false });
   const [homeTab, setHomeTab] = useState<HomeTab>('home');
   const [isDemoUser, setIsDemoUser] = useState(false);
+
+  // ─── URL ↔ page sync ───
+  // Navigation is driven by `currentPage`/`homeTab` state; these two guarded
+  // effects mirror that state into the URL (so every page has a slug) and read
+  // it back (so deep links + browser back/forward work). The "only act if
+  // different" guards prevent the effects from looping into each other.
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // URL → state: initial load, deep links, and back/forward.
+  useEffect(() => {
+    const { page, tab } = stateForPath(location.pathname);
+    setCurrentPage((prev) => (prev === page ? prev : page));
+    if (tab) setHomeTab((prev) => (prev === tab ? prev : (tab as HomeTab)));
+  }, [location.pathname]);
+
+  // state → URL: reflect the current page/tab into the address bar.
+  useEffect(() => {
+    const desired = '/' + pathForState(currentPage, homeTab);
+    if (location.pathname !== desired) navigate(desired);
+    // location.pathname intentionally omitted: this effect fires on state
+    // changes; the URL→state effect handles location changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, homeTab]);
 
   // Derived: are we currently on a UK page?
   const isUKSite = UK_PAGES.has(currentPage);
