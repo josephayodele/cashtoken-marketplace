@@ -1,10 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import GoldCoin from './GoldCoin';
-import {
-  listCountryServices,
-  listUkGiftCards,
-} from '@/lib/cashtokenApi';
+import { listUkGiftCards } from '@/lib/cashtokenApi';
 
 interface MarketplacePageProps {
   onBack?: () => void;
@@ -113,18 +110,6 @@ const UK_MarketplacePage: React.FC<MarketplacePageProps> = ({ onBack, onViewBran
 
   const closeDealPopup = (idx: number) =>
     setActiveDealPopups((prev) => prev.filter((i) => i !== idx));
-
-  // ─── Services catalog (Airtime / Voucher / …) ───
-  const {
-    data: apiServices,
-    isLoading: servicesLoading,
-    isError:   servicesError,
-  } = useQuery({
-    queryKey: ['uk-services'],
-    queryFn: () => listCountryServices('gb'),
-    staleTime: 30 * 60_000,
-    retry: 1,
-  });
 
   // ─── Featured gift cards ───
   const {
@@ -304,55 +289,45 @@ const UK_MarketplacePage: React.FC<MarketplacePageProps> = ({ onBack, onViewBran
           <h2 className="text-xl sm:text-2xl font-black text-gray-900">Services</h2>
         </div>
 
-        {servicesLoading && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="rounded-2xl bg-white border border-gray-100 p-4 animate-pulse h-24" />
-            ))}
-          </div>
-        )}
-
-        {servicesError && !servicesLoading && (
-          <div className="rounded-2xl bg-white border border-gray-100 p-5 text-center">
-            <p className="text-gray-500 text-sm">Could not load the service catalog.</p>
-          </div>
-        )}
-
-        {!servicesLoading && !servicesError && apiServices && apiServices.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {apiServices.map((svc, i) => {
-              const ref       = (svc.serviceRef || svc.ref || '').toString();
-              const name      = (svc.title || svc.name || ref || 'Service').toString();
-              const isAirtime = /airtime/i.test(ref) || /airtime/i.test(name);
-              const isVoucher = /voucher|gift/i.test(ref) || /voucher|gift/i.test(name);
-              const accent    = colorFromName(ref || name);
-              return (
-                <button
-                  key={ref || i}
-                  onClick={() => onViewBrands?.()}
-                  className="group rounded-2xl bg-white border border-gray-100 p-4 text-left hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
-                  style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
-                >
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white mb-3" style={{ backgroundColor: accent }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      {isAirtime ? (
-                        <><rect x="5" y="2" width="14" height="20" rx="2" ry="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></>
-                      ) : isVoucher ? (
-                        <><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /></>
-                      ) : (
-                        <><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></>
-                      )}
-                    </svg>
-                  </div>
-                  <p className="text-sm font-bold text-gray-900 leading-tight">{name}</p>
-                  {svc.description && (
-                    <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{String(svc.description)}</p>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {[
+            {
+              key: 'airtime',
+              name: 'Airtime',
+              accent: '#1E40AF',
+              onClick: () => onViewBrands?.(),
+              icon: (<><rect x="5" y="2" width="14" height="20" rx="2" ry="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></>),
+            },
+            {
+              key: 'vouchers',
+              name: 'Vouchers (Giftcards)',
+              accent: '#7C2D12',
+              onClick: () => document.getElementById('gift-cards')?.scrollIntoView({ behavior: 'smooth' }),
+              icon: (<><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /></>),
+            },
+            {
+              key: 'affiliates',
+              name: 'Affiliate Brands',
+              accent: '#0E7490',
+              onClick: () => document.getElementById('affiliate-brands')?.scrollIntoView({ behavior: 'smooth' }),
+              icon: (<><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" /></>),
+            },
+          ].map((svc) => (
+            <button
+              key={svc.key}
+              onClick={svc.onClick}
+              className="group rounded-2xl bg-white border border-gray-100 p-4 text-left hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+            >
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white mb-3" style={{ backgroundColor: svc.accent }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {svc.icon}
+                </svg>
+              </div>
+              <p className="text-sm font-bold text-gray-900 leading-tight">{svc.name}</p>
+            </button>
+          ))}
+        </div>
       </section>
 
       {/* ─── FEATURED GIFT CARDS (target of the "Gift Card Brands" hero button) ─── */}
@@ -439,6 +414,38 @@ const UK_MarketplacePage: React.FC<MarketplacePageProps> = ({ onBack, onViewBran
             <p className="text-gray-500 text-sm">Check back soon.</p>
           </div>
         )}
+      </section>
+
+      {/* ─── AFFILIATE BRANDS (target of the "Affiliate Brands" service card) ─── */}
+      <section id="affiliate-brands" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 scroll-mt-24">
+        <div className="mb-5">
+          <p className="text-[10px] font-bold text-[#DAA520] uppercase tracking-[0.2em] mb-1">Shop &amp; earn cashback</p>
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900">Affiliate brands</h2>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
+          {/* Temu — image links out to temu.com */}
+          <a
+            href="https://www.temu.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group rounded-2xl bg-white border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+            style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+          >
+            <div className="aspect-[4/3] flex items-center justify-center bg-[#FB6F20]/5 overflow-hidden">
+              <img
+                src="/temu-rounded-512.png"
+                alt="Temu"
+                loading="lazy"
+                className="w-20 h-20 object-contain group-hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+            <div className="p-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Lifestyle</p>
+              <p className="text-sm font-semibold text-gray-900 mt-0.5">Temu</p>
+              <p className="text-xs text-[#7B0F14] font-bold mt-1">Up to 90% OFF</p>
+            </div>
+          </a>
+        </div>
       </section>
 
       {/* ─── HOW IT WORKS ─── */}
