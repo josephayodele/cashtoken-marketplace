@@ -247,6 +247,28 @@ const UK_AirtimeDetails: React.FC<AirtimeDetailsProps> = ({ provider, walletBala
                 </button>
               ))}
             </div>
+
+            {/* Custom amount — UK airtime accepts any amount ≥ £1 (no fixed
+                denominations in the API), so let the user type their own. */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Or enter a custom amount</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">£</span>
+                <input
+                  type="number"
+                  min={1}
+                  inputMode="decimal"
+                  value={selectedAmount != null && !amounts.includes(selectedAmount) ? selectedAmount : ''}
+                  onChange={(e) => {
+                    const v = Math.floor(Number(e.target.value));
+                    setSelectedAmount(Number.isFinite(v) && v >= 1 ? v : null);
+                  }}
+                  placeholder="Enter amount"
+                  className="w-full pl-9 pr-4 py-4 rounded-2xl border border-gray-200 focus:border-[#7B0F14] focus:ring-2 focus:ring-[#7B0F14]/20 outline-none text-lg"
+                />
+              </div>
+            </div>
+
             <div className="flex gap-3 mt-6">
               <button onClick={() => setStep('phone')} className="flex-1 py-4 rounded-2xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
                 Back

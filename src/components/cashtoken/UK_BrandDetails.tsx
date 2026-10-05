@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import GoldCoin from './GoldCoin';
 
 interface BrandDetailsProps {
@@ -23,7 +23,19 @@ const UK_BrandDetails: React.FC<BrandDetailsProps> = ({ brand, walletBalance, on
   const [rating, setRating] = useState<number | null>(null);
   const [showBounce, setShowBounce] = useState(false);
 
-  const amounts = [10, 25, 50, 100, 250, 500];
+  // Real denominations from the API gift-card products. Each product carries a
+  // fixed denomination (min_purchase === max_purchase, e.g. £110/£210/£510);
+  // we collect the distinct values. Fall back to defaults only if the brand
+  // arrived without product data (e.g. a non-API/placeholder brand).
+  const FALLBACK_AMOUNTS = [10, 25, 50, 100, 250, 500];
+  const amounts = useMemo<number[]>(() => {
+    const products = Array.isArray(brand?.products) ? brand.products : [];
+    const denoms = products
+      .map((p: any) => Number(p?.min_purchase))
+      .filter((n: number) => Number.isFinite(n) && n > 0);
+    const unique = Array.from(new Set<number>(denoms)).sort((a, b) => a - b);
+    return unique.length > 0 ? unique : FALLBACK_AMOUNTS;
+  }, [brand]);
   const messages = [
     'Happy Mother\'s Day',
     'Happy Father\'s Day',
