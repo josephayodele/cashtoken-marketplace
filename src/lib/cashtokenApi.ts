@@ -542,6 +542,37 @@ export async function initializeUkAirtimeOrder(params: {
   });
 }
 
+// Convenience wrapper for a GB voucher / gift-card order (docs §3.1.8). Amounts
+// are whole GBP. A single recipient is supported here; the API accepts many.
+export async function initializeUkVoucherOrder(params: {
+  giftCardId: number | string;
+  amount: number;
+  recipientName: string;
+  recipientEmail: string;
+  message?: string;
+}): Promise<Order> {
+  return initializeOrder({
+    params: {
+      gift_card_id: params.giftCardId,
+      message: params.message || '',
+      recipients: [
+        {
+          recipient_name: params.recipientName,
+          recipient_email: params.recipientEmail,
+          amount: params.amount,
+          personalize_message: params.message || '',
+        },
+      ],
+    },
+    request: {
+      requestRef: newRequestRef(),
+      serviceRef: 'voucher',
+      countryRef: 'gb',
+      validation: false,
+    },
+  });
+}
+
 // GET /api/orders/:ref/get-payment-method — available options for an order.
 // Auth: x-api-key. Sorted by listOrder for stable display.
 export async function getPaymentMethods(orderRef: string): Promise<PaymentMethod[]> {
