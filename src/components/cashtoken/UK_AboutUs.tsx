@@ -261,7 +261,7 @@ const UK_AboutUs: React.FC<UK_AboutUsProps> = ({ onNavigate }) => {
           <Reveal visible={heroSection.visible} delay={500} from="zoom">
             <div className="flex flex-wrap gap-4 justify-center">
               <button
-                onClick={() => onNavigate('consumer')}
+                onClick={() => onNavigate('ukconsumer')}
                 className="bg-[#DAA520] hover:bg-[#C4941A] text-white px-8 py-4 rounded-2xl font-bold text-sm transition-all shadow-xl hover:-translate-y-1 inline-flex items-center gap-2.5"
               >
                 Get Started
@@ -931,7 +931,7 @@ const UK_AboutUs: React.FC<UK_AboutUsProps> = ({ onNavigate }) => {
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <button
-              onClick={() => onNavigate('consumer')}
+              onClick={() => onNavigate('ukconsumer')}
               className="bg-[#DAA520] hover:bg-[#C4941A] text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-xl hover:-translate-y-1 inline-flex items-center gap-2.5"
             >
               Start Earning Now

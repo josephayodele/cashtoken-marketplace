@@ -58,6 +58,9 @@ const UK_PAGES = new Set([
   'ukconsumer',
   'ukfaqs',
   'ukcontact',
+  // Shared signed-in pages (UK is the only site now).
+  'profile',
+  'transactions',
 ]);
 
 type HomeTab = 'home' | 'business' | 'team';
@@ -329,14 +332,14 @@ const AppLayout: React.FC = () => {
       setUser(null);
       setWalletBalance(1247.50);
       setTransactions([]);
-      setCurrentPage(isUKSite ? 'uk' : 'global');
+      setCurrentPage('uk');
       return;
     }
     await signOut();
     setUser(null);
     setWalletBalance(1247.50);
     setTransactions([]);
-    setCurrentPage(isUKSite ? 'uk' : 'global');
+    setCurrentPage('uk');
   };
 
   const handleSaveProfile = async () => {
@@ -496,6 +499,22 @@ const AppLayout: React.FC = () => {
           </>
         );
 
+      case 'profile':
+        return (
+          <>
+            <BackButton label="Back to Home" onClick={() => handleNavigate('uk')} />
+            {renderProfilePage()}
+          </>
+        );
+
+      case 'transactions':
+        return (
+          <>
+            <BackButton label="Back to Home" onClick={() => handleNavigate('uk')} />
+            {renderTransactionsPage()}
+          </>
+        );
+
       default:
         return (
           <UK_MarketplacePage
@@ -507,11 +526,12 @@ const AppLayout: React.FC = () => {
     }
   };
 
-  // ─── NIGERIA / SHARED PAGES ──────────────────────────────────────────────────
-  const renderPage = () => {
-    // Delegate all UK pages
-    if (isUKSite) return renderUKPage();
+  // UK is the only site now — every page renders through the UK switch.
+  const renderPage = () => renderUKPage();
 
+  // Legacy Global/Nigeria renderer — retained for reference but no longer
+  // reachable (non-UK content was removed from the site).
+  const _renderPageLegacy = () => {
     switch (currentPage) {
       case 'global':
         return <GlobalPage currentPage="global" onNavigate={handleNavigate} />;
