@@ -128,14 +128,17 @@ const UK_Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSig
     { label: 'Back to Business Website', url:  'https://cashtokenrewards.com' },
   ];
 
-  const handleNav = (item: { page?: string; url?: string }) => {
+  // Accept either a page key string (e.g. handleNav('profile')) or a nav item
+  // object { page, url }. Several call sites pass a bare string, so normalise.
+  const handleNav = (item: string | { page?: string; url?: string }) => {
     setMobileOpen(false);
     setDropdownOpen(false);
-    if (item.url) {
-      window.location.href = item.url;
+    const target = typeof item === 'string' ? { page: item } : item;
+    if (target.url) {
+      window.location.href = target.url;
       return;
     }
-    if (item.page) onNavigate(item.page);
+    if (target.page) onNavigate(target.page);
   };
 
   // FIX 3: universal country routing — GL, NG, UK all work correctly
@@ -262,7 +265,7 @@ const UK_Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSig
                           </svg>
                           Transaction History
                         </button>
-                        <button onClick={() => handleNav('consumer')} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F4E6E6]/50 transition-colors">
+                        <button onClick={() => handleNav('ukconsumer')} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F4E6E6]/50 transition-colors">
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="2" strokeLinecap="round">
                             <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
                           </svg>
@@ -352,7 +355,7 @@ const UK_Header: React.FC<HeaderProps> = ({ currentPage, onNavigate, user, onSig
               </svg>
               Transaction History
             </button>
-            <button onClick={() => handleNav('consumer')} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F4E6E6]/50">
+            <button onClick={() => handleNav('ukconsumer')} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-[#F4E6E6]/50">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7B0F14" strokeWidth="2" strokeLinecap="round">
                 <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
               </svg>
