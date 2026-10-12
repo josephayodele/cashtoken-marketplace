@@ -58,19 +58,44 @@ const UK_BrandDetails: React.FC<BrandDetailsProps> = ({ brand, walletBalance, on
     return () => { aliveRef.current = false; };
   }, []);
 
-  // Real denominations from the API gift-card products. Each product carries a
-  // fixed denomination (min_purchase === max_purchase, e.g. £110/£210/£510);
-  // we collect the distinct values. Fall back to defaults only if the brand
-  // arrived without product data (e.g. a non-API/placeholder brand).
+  // Derive the amount options from the API gift-card products. Per the
+  // middleware: decide fixed vs custom PER PRODUCT by comparing min_purchase and
+  // max_purchase — equal = a fixed preset (tap the exact amount), different = a
+  // custom range (type any value in [min, max]). A brand can have both. Ignore
+  // denom_type: it reports "fixed" even for range products, so the backend (and
+  // we) fall back to the min/max comparison. No product data (placeholder brand)
+  // → show default presets.
   const FALLBACK_AMOUNTS = [10, 25, 50, 100, 250, 500];
-  const amounts = useMemo<number[]>(() => {
+  const { fixedAmounts, customRange } = useMemo<{ fixedAmounts: number[]; customRange: { min: number; max: number } | null }>(() => {
     const products = Array.isArray(brand?.products) ? brand.products : [];
-    const denoms = products
-      .map((p: any) => Number(p?.min_purchase))
-      .filter((n: number) => Number.isFinite(n) && n > 0);
-    const unique = Array.from(new Set<number>(denoms)).sort((a, b) => a - b);
-    return unique.length > 0 ? unique : FALLBACK_AMOUNTS;
+    const fixed = new Set<number>();
+    let rMin = Infinity, rMax = -Infinity, hasRange = false;
+    for (const p of products) {
+      const min = Number(p?.min_purchase);
+      if (!Number.isFinite(min) || min <= 0) continue;
+      const maxRaw = Number(p?.max_purchase);
+      const max = Number.isFinite(maxRaw) && maxRaw > 0 ? maxRaw : min;
+      if (max === min) {
+        fixed.add(min);
+      } else {
+        hasRange = true;
+        rMin = Math.min(rMin, min);
+        rMax = Math.max(rMax, max);
+      }
+    }
+    const fixedAmounts = Array.from(fixed).sort((a, b) => a - b);
+    const customRange = hasRange ? { min: rMin, max: rMax } : null;
+    // Placeholder brands (no product data) get default presets.
+    if (fixedAmounts.length === 0 && !customRange) {
+      return { fixedAmounts: FALLBACK_AMOUNTS, customRange: null };
+    }
+    return { fixedAmounts, customRange };
   }, [brand]);
+
+  const inCustomRange = (amt: number | null): boolean =>
+    customRange != null && amt != null && amt >= customRange.min && amt <= customRange.max;
+  // Valid when it matches a fixed preset OR falls inside the custom range.
+  const amountValid = selectedAmount != null && (fixedAmounts.includes(selectedAmount) || inCustomRange(selectedAmount));
   const messages = [
     'Happy Mother\'s Day',
     'Happy Father\'s Day',
@@ -236,26 +261,63 @@ const UK_BrandDetails: React.FC<BrandDetailsProps> = ({ brand, walletBalance, on
         {step === 'amount' && (
           <div>
             <h2 className="text-xl font-bold text-gray-900 mb-4">Select Gift Card Amount</h2>
-            <div className="grid grid-cols-3 gap-3">
-              {amounts.map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setSelectedAmount(amt)}
-                  className={`py-4 rounded-2xl text-lg font-bold transition-all ${
-                    selectedAmount === amt
-                      ? 'bg-[#7B0F14] text-white shadow-lg scale-105'
-                      : 'bg-[#F4E6E6] text-[#7B0F14] hover:bg-[#E8D4D4]'
-                  }`}
-                >
-                  £{amt}
-                </button>
-              ))}
-            </div>
+
+            {/* Fixed-denomination presets */}
+            {fixedAmounts.length > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                {fixedAmounts.map((amt) => (
+                  <button
+                    key={amt}
+                    onClick={() => setSelectedAmount(amt)}
+                    className={`py-4 rounded-2xl text-lg font-bold transition-all ${
+                      selectedAmount === amt
+                        ? 'bg-[#7B0F14] text-white shadow-lg scale-105'
+                        : 'bg-[#F4E6E6] text-[#7B0F14] hover:bg-[#E8D4D4]'
+                    }`}
+                  >
+                    £{amt}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Custom-range input — this brand has a product that accepts any
+                amount between min and max. */}
+            {customRange && (
+              <div className={fixedAmounts.length > 0 ? 'mt-4' : ''}>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {fixedAmounts.length > 0 ? 'Or enter a custom amount' : 'Enter an amount'}
+                  <span className="text-gray-400 font-normal"> (£{customRange.min} – £{customRange.max})</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">£</span>
+                  <input
+                    type="number"
+                    min={customRange.min}
+                    max={customRange.max}
+                    inputMode="decimal"
+                    value={selectedAmount != null && !fixedAmounts.includes(selectedAmount) ? selectedAmount : ''}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setSelectedAmount(e.target.value === '' || !Number.isFinite(v) ? null : v);
+                    }}
+                    placeholder={`${customRange.min} – ${customRange.max}`}
+                    className="w-full pl-9 pr-4 py-4 rounded-2xl border border-gray-200 focus:border-[#7B0F14] focus:ring-2 focus:ring-[#7B0F14]/20 outline-none text-lg"
+                  />
+                </div>
+                {selectedAmount != null && !fixedAmounts.includes(selectedAmount) && !inCustomRange(selectedAmount) && (
+                  <p className="text-red-500 text-sm mt-2 font-medium">
+                    Enter an amount between £{customRange.min} and £{customRange.max}.
+                  </p>
+                )}
+              </div>
+            )}
+
             <button
-              onClick={() => selectedAmount && setStep('message')}
-              disabled={!selectedAmount}
+              onClick={() => amountValid && setStep('message')}
+              disabled={!amountValid}
               className={`w-full mt-6 py-4 rounded-2xl font-semibold text-white transition-all ${
-                selectedAmount ? 'bg-[#7B0F14] hover:bg-[#5A0B10] shadow-lg' : 'bg-gray-300 cursor-not-allowed'
+                amountValid ? 'bg-[#7B0F14] hover:bg-[#5A0B10] shadow-lg' : 'bg-gray-300 cursor-not-allowed'
               }`}
             >
               Continue — £{selectedAmount || 0}
