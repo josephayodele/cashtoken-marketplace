@@ -27,13 +27,6 @@ interface AuthModalProps {
   country?: CountryCode;
 }
 
-const DEMO_USER: UserProfile = {
-  id: 'demo-user-001',
-  full_name: 'Alex Johnson',
-  avatar_url: null,
-  email: 'demo@cashtoken.uk',
-};
-
 type Step = 'identify' | 'otp' | 'register';
 
 // Phone sign-in is rejected by the IDP for country=GB (see openapi.yaml §3098).
@@ -199,13 +192,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuccess, c
     }
   };
 
-  const handleDemo = () => {
-    onAuthSuccess(DEMO_USER);
-    onClose();
-  };
-
-  const currencySymbol = country === 'GB' ? '£' : country === 'NG' ? '₦' : '$';
-
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
@@ -285,22 +271,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuccess, c
               </div>
 
               <SubmitButton loading={loading} label="Send verification code" loadingLabel="Sending code..." />
-
-              <Divider />
-
-              <button
-                type="button"
-                onClick={handleDemo}
-                className="w-full py-3.5 rounded-xl font-semibold text-[#7B0F14] border-2 border-[#7B0F14]/30 hover:border-[#7B0F14] hover:bg-[#F4E6E6] transition-all flex items-center justify-center gap-2"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-                </svg>
-                Use Demo Account
-              </button>
-              <div className="bg-[#F4E6E6]/60 rounded-xl px-4 py-2.5 text-xs text-gray-500 text-center">
-                Demo: <span className="font-semibold text-[#7B0F14]">Alex Johnson</span> · {currencySymbol}1,247.50 wallet
-              </div>
             </form>
           )}
 
@@ -395,14 +365,6 @@ const SubmitButton: React.FC<{ loading: boolean; label: string; loadingLabel: st
       </span>
     ) : label}
   </button>
-);
-
-const Divider: React.FC = () => (
-  <div className="flex items-center gap-3">
-    <div className="flex-1 h-px bg-gray-200" />
-    <span className="text-xs text-gray-400 font-medium">or</span>
-    <div className="flex-1 h-px bg-gray-200" />
-  </div>
 );
 
 function friendlyError(err: unknown, fallback: string): string {

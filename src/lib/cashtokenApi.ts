@@ -91,11 +91,17 @@ async function request<T>(
     /** When true, require *some* bearer (override or stored). */
     requireBearer?: boolean;
     unwrap?: boolean;
+    /**
+     * When true, never fall back to the stored user token. Use for anonymous
+     * IDP grant endpoints (e.g. silent-mode): attaching a stale/expired user
+     * token there makes the IDP reject the grant ("grant request is invalid").
+     */
+    anonymous?: boolean;
   } = {},
 ): Promise<T> {
-  const { method = 'GET', body, bearerOverride, requireBearer = false, unwrap = true } = options;
+  const { method = 'GET', body, bearerOverride, requireBearer = false, unwrap = true, anonymous = false } = options;
 
-  const bearer = bearerOverride || localStorage.getItem(LS.accessToken) || '';
+  const bearer = bearerOverride || (anonymous ? '' : localStorage.getItem(LS.accessToken)) || '';
 
   if (requireBearer && !bearer) {
     throw new CashtokenApiError(401, 'Not signed in', 'NO_BEARER');
@@ -186,6 +192,7 @@ export async function silentSignIn(params: {
     method: 'POST',
     body: { ...params, sessionID: ensureSessionId() },
     unwrap: false,
+    anonymous: true,   // never carry a stale user token into the grant request
   });
   return pickAuthTokens(raw);
 }
@@ -280,6 +287,10 @@ export async function beginSignIn(params: {
   subIdentifier: SubIdentifier;
   country: CountryCode;
 }): Promise<{ challenge: OtpChallenge; subjectToken: string }> {
+  // Start each interactive sign-in from a fresh sessionID. Reusing the previous
+  // one (e.g. after a sign-in → sign-out → sign-in cycle) can be rejected by the
+  // IDP as an already-consumed grant ("grant request is invalid").
+  localStorage.removeItem(LS.sessionId);
   const silent = await silentSignIn(params);
   if (!silent.access_token) {
     throw new CashtokenApiError(500, 'Silent-mode did not return an access_token');
