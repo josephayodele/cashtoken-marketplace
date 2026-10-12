@@ -509,6 +509,72 @@ export async function getTransaction(
   return raw && typeof raw === 'object' ? (raw as TransactionRecord) : null;
 }
 
+// ─── Rewards ─────────────────────────────────────────────────────────────────
+
+// Aggregate reward summary (openapi §RewardsSummary). Money fields are
+// decimal-as-string; `currency` is null when totals span markets.
+export interface RewardsSummary {
+  totalEarned?: string;
+  currency?: string | null;
+  entriesThisWeek?: number;
+  cashbackReceived?: string;
+  brandCount?: number;
+  asOf?: string;
+  currentWeekStart?: string | null;
+  [key: string]: unknown;
+}
+
+// A single reward row (openapi §Reward) — display fields line up with the
+// mobile RewardProgram contract.
+export interface RewardRecord {
+  ref?: string;
+  orderRef?: string;
+  type?: string;              // 'cashtoken' | 'cashtokenpoint'
+  status?: string;            // pending | queued | processing | completed | failed
+  cashtoken?: number;
+  cashback?: number;
+  value?: number;
+  currency?: string | null;
+  title?: string | null;
+  subtitle?: string | null;
+  brand?: string | null;
+  imageUrl?: string | null;
+  category?: string | null;   // 'cashback' | 'raffle_entry' | ...
+  createdAt?: string;
+  processedAt?: string | null;
+  [key: string]: unknown;
+}
+
+// GET /api/rewards/summary?market=GB — auth: x-api-key + Bearer.
+export async function getRewardsSummary(market: string): Promise<RewardsSummary | null> {
+  const raw = await request<any>(
+    `/api/rewards/summary?market=${encodeURIComponent(market)}`,
+    { requireBearer: true },
+  );
+  return raw && typeof raw === 'object' ? (raw as RewardsSummary) : null;
+}
+
+// GET /api/rewards/list — paginated rewards for the signed-in user.
+// Filters are bracketed like transactions (filter[country.code], filter[status]).
+export async function listRewards(opts: {
+  market?: string;         // -> filter[country.code]
+  status?: string;         // -> filter[status]
+  page?: number;
+  limit?: number;
+  sort?: string;           // whitelisted: createdAt, updatedAt, processedAt, cashtoken, cashback
+} = {}): Promise<RewardRecord[]> {
+  const qs = new URLSearchParams();
+  qs.set('page', String(opts.page ?? 1));
+  qs.set('limit', String(opts.limit ?? 20));
+  qs.set('sort', opts.sort ?? 'createdAt:desc');
+  if (opts.market) qs.set('filter[country.code]', opts.market);
+  if (opts.status) qs.set('filter[status]', opts.status);
+  const raw = await request<any>(`/api/rewards/list?${qs.toString()}`, { requireBearer: true });
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.items)) return raw.items;
+  return [];
+}
+
 // ─── Orders & payments (unified order flow) ──────────────────────────────────
 // Spec: v2_technical_api_documentation §3 (Order Lifecycle & Fulfillment) and
 // §15 (Complete Order Flow). All services share this flow:
