@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { pathForState, stateForPath } from '@/lib/pageRoutes';
 import {
   getRememberedSubject,
+  getTransaction,
   getUserInfo,
   getWalletBalance,
   hasStoredSession,
@@ -74,12 +75,150 @@ interface UserProfile {
 
 interface Transaction {
   id: string;
-  type: string;
+  ref: string;              // server transaction ref (empty for demo/local rows)
+  type: string;             // coarse kind, drives icon/label/colour
+  mode: 'in' | 'out';       // 'out' = debit/spend, 'in' = credit (from API)
   amount: number;
+  currency: string;         // ISO code, e.g. 'GBP'
+  title: string;
   description: string;
   brand: string | null;
   created_at: string;
 }
+
+// Map a middleware TransactionRecord to the local row the UI renders. `mode`
+// ('out'/'in') is the authoritative debit/credit signal; `type` is a coarse kind
+// used only to pick an icon/label/colour. Amount is normalised to a positive
+// magnitude (sign is conveyed by `mode`).
+function normaliseTransaction(
+  r: TransactionRecord,
+  i: number,
+  fallbackCurrency = 'GBP',
+): Transaction {
+  const mode: 'in' | 'out' = r.mode === 'in' ? 'in' : 'out';
+  const svcName =
+    typeof r.service === 'object' ? (r.service?.name ?? '') : ((r.service as string) || '');
+  const label = `${r.title ?? ''} ${r.description ?? ''} ${svcName}`;
+  const type =
+    (r.type as string) ||
+    (mode === 'in' ? 'reward' : /gift|voucher/i.test(label) ? 'gift_card' : 'withdrawal');
+  return {
+    id: String(r.ref ?? r.id ?? i),
+    ref: String(r.ref ?? r.id ?? ''),
+    type,
+    mode,
+    amount: Math.abs(Number(r.amount ?? 0)),
+    currency: (r.currency as string) || fallbackCurrency,
+    title: (r.title as string) || '',
+    description: (r.description as string) || (r.title as string) || 'Transaction',
+    brand: svcName || null,
+    created_at: (r.createdAt || r.created_at || new Date().toISOString()) as string,
+  };
+}
+
+// Currency glyph for the small set of markets the site serves.
+function currencySymbol(code?: string): string {
+  switch ((code || '').toUpperCase()) {
+    case 'GBP': return '£';
+    case 'NGN': return '₦';
+    case 'USD': return '$';
+    case 'EUR': return '€';
+    default:    return '£';
+  }
+}
+
+function stringifyDetailValue(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v); } catch { return String(v); }
+  }
+  return String(v);
+}
+
+const TxDetailRow: React.FC<{ label: string; value: string; mono?: boolean }> = ({ label, value, mono }) => (
+  <div className="flex items-start justify-between gap-4">
+    <span className="text-sm text-gray-500 flex-shrink-0">{label}</span>
+    <span className={`text-right break-all text-gray-900 ${mono ? 'font-mono text-xs' : 'text-sm font-medium'}`}>{value}</span>
+  </div>
+);
+
+// Receipt-style detail for a single transaction. The tapped row is shown
+// immediately; `data` arrives from GET /api/transactions/:ref and fills in the
+// `details[]` line items, order ref, and rewards earned.
+const TransactionDetailModal: React.FC<{
+  tx: Transaction;
+  data: TransactionRecord | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+}> = ({ tx, data, loading, error, onClose }) => {
+  const isDebit = tx.mode === 'out';
+  const sym = currencySymbol((data?.currency as string) || tx.currency);
+  const amount = Math.abs(Number(data?.amount ?? tx.amount) || 0);
+  const when = new Date(tx.created_at);
+  const details = Array.isArray(data?.details) ? data!.details! : [];
+  const cashtoken = Number(data?.cashtoken ?? 0);
+  const cashback = Number(data?.cashback ?? 0);
+  const reference = (data?.ref as string) || tx.ref;
+  const orderRef = data?.orderRef ? String(data.orderRef) : '';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4 py-6"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-xl w-full max-w-md max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-[#7B0F14] text-white px-6 py-5 rounded-t-3xl relative">
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-4 right-4 text-white/80 hover:text-white"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <p className="text-white/70 text-xs uppercase tracking-wide">{isDebit ? 'Debit' : 'Credit'}</p>
+          <p className="text-3xl font-bold mt-1">{isDebit ? '-' : '+'}{sym}{amount.toFixed(2)}</p>
+          <p className="text-white/80 text-sm mt-1 truncate">{data?.title || tx.title || tx.description}</p>
+        </div>
+
+        <div className="px-6 py-5 space-y-3">
+          {loading && (
+            <div className="flex items-center gap-3 text-gray-500 text-sm py-2">
+              <span className="w-4 h-4 border-2 border-[#7B0F14] border-t-transparent rounded-full animate-spin" />
+              Loading details…
+            </div>
+          )}
+          {error && !loading && (
+            <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{error}</p>
+          )}
+
+          {(data?.description || tx.description) && (
+            <TxDetailRow label="Description" value={(data?.description as string) || tx.description} />
+          )}
+          <TxDetailRow
+            label="Date"
+            value={when.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          />
+
+          {details.map((d, idx) => (
+            <TxDetailRow key={idx} label={d.title || '—'} value={stringifyDetailValue(d.value)} />
+          ))}
+
+          {cashtoken > 0 && <TxDetailRow label="CashTokens earned" value={String(cashtoken)} />}
+          {cashback > 0 && <TxDetailRow label="Cashback" value={`${sym}${cashback.toFixed(2)}`} />}
+
+          {reference && <TxDetailRow label="Reference" value={reference} mono />}
+          {orderRef && <TxDetailRow label="Order" value={orderRef} mono />}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const AppLayout: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('uk');
@@ -96,6 +235,14 @@ const AppLayout: React.FC = () => {
   const [profileForm, setProfileForm] = useState({ full_name: '', saving: false, saved: false });
   const [homeTab, setHomeTab] = useState<HomeTab>('home');
   const [isDemoUser, setIsDemoUser] = useState(false);
+
+  // Transaction detail modal (GET /api/transactions/:ref). `txDetail` is the row
+  // the user tapped (shown immediately); `txDetailData` is the enriched record
+  // fetched from the middleware (receipt `details[]`, order ref, etc.).
+  const [txDetail, setTxDetail] = useState<Transaction | null>(null);
+  const [txDetailData, setTxDetailData] = useState<TransactionRecord | null>(null);
+  const [txDetailLoading, setTxDetailLoading] = useState(false);
+  const [txDetailError, setTxDetailError] = useState<string | null>(null);
 
   // ─── URL ↔ page sync ───
   // Navigation is driven by `currentPage`/`homeTab` state; these two guarded
@@ -210,18 +357,36 @@ const AppLayout: React.FC = () => {
         sort: 'createdAt:desc',
       });
       // Normalise to the local Transaction shape the UI renders.
-      setTransactions(records.map((r: TransactionRecord, i) => ({
-        id: String(r.ref ?? r.id ?? i),
-        type: (r.type as string) || (typeof r.service === 'object' ? r.service?.ref ?? '' : (r.service as string)) || 'deposit',
-        amount: Number(r.amount ?? 0),
-        description: (r.description as string) || '',
-        brand: typeof r.service === 'object' ? (r.service?.name ?? null) : null,
-        created_at: (r.createdAt || r.created_at || new Date().toISOString()) as string,
-      })));
+      setTransactions(records.map((r, i) => normaliseTransaction(r, i, isUKSite ? 'GBP' : 'NGN')));
     } catch (err) {
       console.warn('Failed to load transactions:', err);
       setTransactions([]);
     }
+  };
+
+  // Open the transaction-detail modal. The tapped row renders immediately; for
+  // real (non-demo) rows we enrich it from GET /api/transactions/:ref.
+  const openTransaction = async (tx: Transaction) => {
+    setTxDetail(tx);
+    setTxDetailData(null);
+    setTxDetailError(null);
+    if (isDemoUser || !tx.ref || tx.ref.startsWith('demo-')) return;
+    setTxDetailLoading(true);
+    try {
+      const data = await getTransaction(tx.ref, isUKSite ? 'GB' : 'NG');
+      setTxDetailData(data);
+    } catch (err: any) {
+      setTxDetailError(err?.message || 'Could not load transaction details.');
+    } finally {
+      setTxDetailLoading(false);
+    }
+  };
+
+  const closeTransaction = () => {
+    setTxDetail(null);
+    setTxDetailData(null);
+    setTxDetailError(null);
+    setTxDetailLoading(false);
   };
 
   const handleUpdateBalance = useCallback(async (
@@ -250,17 +415,22 @@ const AppLayout: React.FC = () => {
 
       await loadTransactions();
     } else if (isDemoUser) {
+      const demoType = amount < 0 ? (type === 'gift_card' ? 'gift_card' : 'withdrawal') : type;
       const newTx: Transaction = {
         id: `demo-${Date.now()}`,
-        type: amount < 0 ? (type === 'gift_card' ? 'gift_card' : 'withdrawal') : type,
+        ref: '',                              // local-only: no server detail to fetch
+        type: demoType,
+        mode: amount < 0 ? 'out' : 'in',
         amount: Math.abs(amount),
+        currency: isUKSite ? 'GBP' : 'NGN',
+        title: description || (amount < 0 ? 'Wallet debit' : 'Wallet credit'),
         description: description || (amount < 0 ? 'Wallet debit' : 'Wallet credit'),
         brand,
         created_at: new Date().toISOString(),
       };
       setTransactions((prev) => [newTx, ...prev]);
     }
-  }, [walletBalance, user, isDemoUser]);
+  }, [walletBalance, user, isDemoUser, isUKSite]);
 
   const handleSimpleBalanceUpdate = useCallback((amount: number) => {
     handleUpdateBalance(
@@ -850,9 +1020,14 @@ const AppLayout: React.FC = () => {
               <div className="divide-y divide-gray-50">
                 {transactions.map((tx) => {
                   const colors = getTypeColor(tx.type);
-                  const isDebit = tx.type === 'gift_card' || tx.type === 'withdrawal';
+                  const isDebit = tx.mode === 'out';
                   return (
-                    <div key={tx.id} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50 transition-colors">
+                    <button
+                      type="button"
+                      key={tx.id}
+                      onClick={() => openTransaction(tx)}
+                      className="w-full text-left flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50 transition-colors focus:outline-none focus:bg-gray-50"
+                    >
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: colors.bgLight }}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2" strokeLinecap="round">
                           {tx.type === 'gift_card'  && <><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /></>}
@@ -865,18 +1040,18 @@ const AppLayout: React.FC = () => {
                         <p className="font-medium text-gray-900 text-sm truncate">{tx.description}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.bgLight, color: colors.text }}>{getTypeLabel(tx.type)}</span>
-                          {tx.brand && <span className="text-xs text-gray-400">{tx.brand}</span>}
+                          {tx.brand && <span className="text-xs text-gray-400 truncate">{tx.brand}</span>}
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className={`font-bold text-sm ${isDebit ? 'text-red-600' : 'text-green-600'}`}>
-                          {isDebit ? '-' : '+'}£{tx.amount.toFixed(2)}
+                          {isDebit ? '-' : '+'}{currencySymbol(tx.currency)}{tx.amount.toFixed(2)}
                         </p>
                         <p className="text-[10px] text-gray-400 mt-0.5">
                           {new Date(tx.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </p>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -932,6 +1107,16 @@ const AppLayout: React.FC = () => {
         onAuthSuccess={handleAuthSuccess}
         country={isUKSite ? 'GB' : 'NG'}
       />
+
+      {txDetail && (
+        <TransactionDetailModal
+          tx={txDetail}
+          data={txDetailData}
+          loading={txDetailLoading}
+          error={txDetailError}
+          onClose={closeTransaction}
+        />
+      )}
 
       <style>{`
         @keyframes glow {

@@ -362,19 +362,59 @@ export interface ServiceCatalogEntry {
   [key: string]: unknown;
 }
 
+// One free-form receipt line on a transaction (e.g. { title: 'Network', value: 'MTN' }).
+export interface TransactionDetailRow {
+  title?: string;
+  value?: unknown;  // string | number | boolean | object — render as string
+}
+
+// Camel-cased Transaction projection per openapi §Transaction. `mode` is the
+// definitive credit/debit signal ('out' = spend/debit, 'in' = credit). `amount`
+// is decimal-as-string on the wire. Extra/compat fields kept permissive.
 export interface TransactionRecord {
   id?: number | string;
   ref?: string;
-  amount?: number;
-  currency?: string;
-  status?: string;
-  type?: string;
+  userRef?: string;
+  countryRef?: string;
+  serviceRef?: string;
+  serviceProviderRef?: string;
+  orderRef?: string;
+  correlatorId?: string | null;
+  title?: string;
   description?: string;
+  amount?: number | string;
+  currency?: string;
+  mode?: 'in' | 'out' | string;
+  icon?: string | null;
+  cashtoken?: number;
+  cashback?: number;
+  details?: TransactionDetailRow[];
   createdAt?: string;
+  updatedAt?: string;
+  // Compat fields for legacy/local shapes.
   created_at?: string;
+  type?: string;
+  status?: string;
   service?: { ref?: string; name?: string } | string;
   country?: { ref?: string; code?: string } | string;
   [key: string]: unknown;
+}
+
+// Page-based pagination metadata (data.meta on the list response).
+export interface TransactionListMeta {
+  currentPage?: number;
+  totalPages?: number;
+  totalCount?: number;
+}
+
+export interface TransactionListOptions {
+  countryCode?: string;    // 'GB' -> filter[country.code]
+  serviceName?: string;    // filter[service.name]  e.g. 'ng.vas-vendor.airtime'
+  orderStatus?: string;    // filter[order.status]
+  paymentStatus?: string;  // filter[payment.status]
+  page?: number;
+  limit?: number;
+  sort?: string;           // '<field>:<asc|desc>' — only createdAt is whitelisted
 }
 
 // GET /api/uk/gift-card — UK voucher catalog. Auth: x-api-key only.
@@ -419,21 +459,54 @@ export async function listCountryServices(country: string): Promise<ServiceCatal
 }
 
 // GET /api/transactions/list — auth: x-api-key + Bearer (user-scoped).
-export async function listTransactions(opts: {
-  countryCode?: string;   // e.g. 'GB' (uppercase — matches filter format in docs §4.1)
-  limit?: number;
-  start?: number;
-  sort?: string;
-} = {}): Promise<TransactionRecord[]> {
+// Per openapi §Transaction: page/limit pagination, sort=<field>:<dir>, and
+// BRACKETED filters (filter[country.code], filter[service.name],
+// filter[order.status], filter[payment.status]). The server (qs) decodes the
+// percent-encoded brackets URLSearchParams produces.
+export async function listTransactionsPage(
+  opts: TransactionListOptions = {},
+): Promise<{ items: TransactionRecord[]; meta: TransactionListMeta }> {
   const qs = new URLSearchParams();
-  qs.set('start', String(opts.start ?? 0));
+  qs.set('page', String(opts.page ?? 1));
   qs.set('limit', String(opts.limit ?? 50));
   qs.set('sort', opts.sort ?? 'createdAt:desc');
-  if (opts.countryCode) qs.set('filter', `country.code:${opts.countryCode}`);
+  if (opts.countryCode)   qs.set('filter[country.code]', opts.countryCode);
+  if (opts.serviceName)   qs.set('filter[service.name]', opts.serviceName);
+  if (opts.orderStatus)   qs.set('filter[order.status]', opts.orderStatus);
+  if (opts.paymentStatus) qs.set('filter[payment.status]', opts.paymentStatus);
   const raw = await request<any>(`/api/transactions/list?${qs.toString()}`, { requireBearer: true });
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw?.items)) return raw.items;
-  return [];
+  const items: TransactionRecord[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.items)
+    ? raw.items
+    : [];
+  const meta: TransactionListMeta =
+    raw && typeof raw === 'object' && raw.meta && typeof raw.meta === 'object' ? raw.meta : {};
+  return { items, meta };
+}
+
+// Convenience wrapper returning just the array (most callers only render a list).
+export async function listTransactions(
+  opts: TransactionListOptions = {},
+): Promise<TransactionRecord[]> {
+  const { items } = await listTransactionsPage(opts);
+  return items;
+}
+
+// GET /api/transactions/:transactionRef — single transaction, user-scoped.
+// `transactionRef` accepts the ref UUID, numeric id, or transaction_ref. When a
+// countryCode is supplied the country-scoped variant is used instead, which 404s
+// if the transaction belongs to a different country. Returns null on an empty body.
+export async function getTransaction(
+  transactionRef: string,
+  countryCode?: string,
+): Promise<TransactionRecord | null> {
+  const ref = encodeURIComponent(transactionRef);
+  const path = countryCode
+    ? `/api/countries/${countryCode}/transactions/${ref}`
+    : `/api/transactions/${ref}`;
+  const raw = await request<any>(path, { requireBearer: true });
+  return raw && typeof raw === 'object' ? (raw as TransactionRecord) : null;
 }
 
 // ─── Orders & payments (unified order flow) ──────────────────────────────────
